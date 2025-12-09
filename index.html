@@ -176,27 +176,6 @@
         </div>
     </div>
 
-    <h1>🚀 自我成長儀表板</h1>
-
-    <div class="card check-in-box">
-        <h2 id="dateTitle">📅 今天打卡</h2>
-        <div class="checkbox-group">
-            <label><input type="checkbox" id="checkEnglish"> 英文</label>
-            <label><input type="checkbox" id="checkExercise"> 運動習慣</label>
-            <label><input type="checkbox" id="checkReading"> 讀書習慣</label>
-            <label><input type="checkbox" id="checkSleeping"> 睡覺習慣</label>
-        </div>
-        <button onclick="submitHabit()" id="submitBtn" style="background: #00897b;">送出紀錄</button>
-        <span id="statusMsg" style="margin-left: 10px; color: #666;"></span>
-    </div>
-
-    <div class="card">
-        <h2>📈 能力成長曲線 (每日複利)</h2>
-        <canvas id="habitChart"></canvas>
-    </div>
-
-    <hr style="border: 0; border-top: 2px dashed #ddd; margin: 30px 0;">
-
     <div class="grid-container">
         <div class="card" style="background: linear-gradient(135deg, #388e3c 0%, #81c784 100%); color: white; text-align: center; padding: 20px;">
             <h2 style="margin:0; font-size: 1.1rem; opacity: 0.9;">💸 生活可用資金</h2>
@@ -206,57 +185,17 @@
         <div class="card" style="background: linear-gradient(135deg, #e53935 0%, #e57373 100%); color: white; text-align: center; padding: 20px;">
             <h2 style="margin:0; font-size: 1.1rem; opacity: 0.9;">📉 本月總支出</h2>
             <div id="monthExpenseDisplay" style="font-size: 2.5rem; font-weight: bold; margin: 5px 0;">計算中...</div>
-            <div style="font-size: 0.85rem; opacity: 0.8;">(從 1 號累計至今)</div>
-        </div>
-    </div>
-
-    <div class="card full-width" style="border-left: 5px solid #2196F3;">
-        <h2>💳 各帳戶即時餘額 (對帳專區)</h2>
-        <div id="accountBalanceContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px;">
-            <div style="color: #888;">計算中...</div>
-        </div>
-    </div>
-
-    <div class="card full-width" style="border-left: 5px solid #ff9800;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h2 style="margin:0; font-size: 1.1rem; opacity: 0.9;">🛍️ 夢想購物車</h2>
-            <button onclick="toggleWishForm()" style="background: #ff9800; font-size: 0.8rem; padding: 5px 10px;">＋ 許願</button>
-        </div>
-
-        <div id="wishForm" class="asset-form" style="display:none; background:#fff3e0; padding:15px; border-radius:10px; margin-bottom:20px;">
-            <label>項目：<input type="text" id="wishItem" placeholder="想買什麼？"></label>
-            <label>金額：<input type="number" id="wishAmount" placeholder="價格"></label>
-            <label>備註：<input type="text" id="wishNote" placeholder="網址或備註"></label>
-            <button onclick="submitWish()" style="background: #ff9800; color: white;">加入清單</button>
-        </div>
-
-        <div id="wishlistContainer" style="display: flex; flex-direction: column; gap: 10px;">
-            <div style="color:#888;">載入中...</div>
-        </div>
-    </div>
-
-    <div class="card full-width">
-        <h2>📊 本月 vs 上月 支出比較</h2>
-        <div class="grid-container">
-            <div style="height: 300px;"><canvas id="expenseCompareChart"></canvas></div>
-            <div>
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
-                    <thead>
-                        <tr style="border-bottom: 2px solid #ddd; text-align: left;">
-                            <th style="padding: 8px;">類別</th>
-                            <th style="padding: 8px; color: #36a2eb;">本月</th>
-                            <th style="padding: 8px; color: #ff6384;">上月</th>
-                        </tr>
-                    </thead>
-                    <tbody id="compareTableBody"></tbody>
-                </table>
-                <div style="margin-top: 15px;">
-                    <div style="padding: 8px; background: #fce4ec; border-radius: 5px; color: #c2185b; font-size: 0.9em; margin-bottom:5px;">
-                        📅 上月總支出：<span id="lastMonthTotalDisplay" style="font-weight: bold;">...</span>
-                    </div>
-                    <div style="padding: 8px; background: #fff3cd; border-radius: 5px; color: #856404; font-size: 0.9em;">
-                        💡 差異：<span id="totalDiff" style="font-weight: bold;">...</span>
-                    </div>
+            
+            <div style="margin-top: 15px;">
+                <div style="display:flex; justify-content:space-between; font-size:0.85em; opacity:0.9; margin-bottom:5px;">
+                    <span>預算: $<span id="budgetLimit">0</span></span>
+                    <span id="budgetPercent">0%</span>
+                </div>
+                <div style="width:100%; background:rgba(255,255,255,0.3); border-radius:10px; height:8px; overflow:hidden;">
+                    <div id="budgetBar" style="height:100%; background:#fff; width:0%; transition:width 1s ease-in-out;"></div>
+                </div>
+                <div id="budgetMessage" style="font-size:0.9em; margin-top:8px; font-weight:bold; text-align:right;">
+                    計算中...
                 </div>
             </div>
         </div>
@@ -309,6 +248,40 @@
         </div>
     </div>
 
+    <div class="card full-width">
+        <h2>📊 本月 vs 上月 支出比較</h2>
+        <div class="grid-container">
+            <div style="height: 300px;"><canvas id="expenseCompareChart"></canvas></div>
+            <div>
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #ddd; text-align: left;">
+                            <th style="padding: 8px;">類別</th>
+                            <th style="padding: 8px; color: #36a2eb;">本月</th>
+                            <th style="padding: 8px; color: #ff6384;">上月</th>
+                        </tr>
+                    </thead>
+                    <tbody id="compareTableBody"></tbody>
+                </table>
+                <div style="margin-top: 15px;">
+                    <div style="padding: 8px; background: #fce4ec; border-radius: 5px; color: #c2185b; font-size: 0.9em; margin-bottom:5px;">
+                        📅 上月總支出：<span id="lastMonthTotalDisplay" style="font-weight: bold;">...</span>
+                    </div>
+                    <div style="padding: 8px; background: #fff3cd; border-radius: 5px; color: #856404; font-size: 0.9em;">
+                        💡 差異：<span id="totalDiff" style="font-weight: bold;">...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card full-width" style="border-left: 5px solid #2196F3;">
+        <h2>💳 各帳戶即時餘額 (對帳專區)</h2>
+        <div id="accountBalanceContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px;">
+            <div style="color: #888;">計算中...</div>
+        </div>
+    </div>
+
     <div class="card full-width" style="border-left: 5px solid #9c27b0;">
         <h2>🔄 內部轉帳 / 領錢 / 還債</h2>
         <div class="asset-form" style="flex-direction: row; flex-wrap: wrap; align-items: flex-end;">
@@ -341,6 +314,49 @@
             </div>
             <button onclick="submitTransfer()" id="btnTrans" style="background: #9c27b0; height: 38px; margin-bottom: 2px;">確認</button>
         </div>
+    </div>
+
+    <div class="card full-width" style="border-left: 5px solid #ff9800;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 style="margin:0; font-size: 1.1rem; opacity: 0.9;">🛍️ 夢想購物車</h2>
+            <button onclick="toggleWishForm()" style="background: #ff9800; font-size: 0.8rem; padding: 5px 10px;">＋ 許願</button>
+        </div>
+
+        <div id="wishForm" class="asset-form" style="display:none; background:#fff3e0; padding:15px; border-radius:10px; margin-bottom:20px;">
+            <label>項目：<input type="text" id="wishItem" placeholder="想買什麼？"></label>
+            <label>金額：<input type="number" id="wishAmount" placeholder="價格"></label>
+            <label>備註：<input type="text" id="wishNote" placeholder="網址或備註"></label>
+            <button onclick="submitWish()" style="background: #ff9800; color: white;">加入清單</button>
+        </div>
+
+        <div id="wishlistContainer" style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="color:#888;">載入中...</div>
+        </div>
+    </div>
+
+    <hr style="border: 0; border-top: 2px dashed #ddd; margin: 30px 0;">
+
+    <h1>🚀 自我成長儀表板</h1>
+
+    <div class="card check-in-box">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2 style="margin:0; font-size: 1.2rem;">📅 習慣打卡</h2>
+            <input type="date" id="habitDate" style="border: 1px solid #b2ebf2; padding: 5px 10px; border-radius: 8px; background: rgba(255,255,255,0.8); font-weight: bold; color: #00796b;">
+        </div>
+        
+        <div class="checkbox-group">
+            <label><input type="checkbox" id="checkEnglish"> 英文</label>
+            <label><input type="checkbox" id="checkExercise"> 運動習慣</label>
+            <label><input type="checkbox" id="checkReading"> 讀書習慣</label>
+            <label><input type="checkbox" id="checkSleeping"> 睡覺習慣</label>
+        </div>
+        <button onclick="submitHabit()" id="submitBtn" style="background: #00897b;">送出紀錄</button>
+        <span id="statusMsg" style="margin-left: 10px; color: #666;"></span>
+    </div>
+
+    <div class="card">
+        <h2>📈 能力成長曲線 (每日複利)</h2>
+        <canvas id="habitChart"></canvas>
     </div>
 
     <hr style="border: 0; border-top: 2px dashed #ddd; margin: 30px 0;">
@@ -509,7 +525,7 @@
     }
 
     // 4. 每日登入檢查 (輸入剛剛設定的密碼)
-    const inputCheck = prompt("🔒 請輸入密碼解鎖儀表板：");
+    const inputCheck = prompt("🔒 請輸入密碼解鎖資產生活紀錄版：");
     if (inputCheck !== savedPass) {
         document.body.innerHTML = `
             <div style='display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;text-align:center;'>
@@ -524,34 +540,44 @@
     // 5. 設定全域變數 (讓後面的程式使用)
     const API_URL = savedUrl;
     const SAVING_GOAL = 1000000; // 你的第一桶金目標
+    const MONTHLY_BUDGET = 15000; // 每月總預算 (例如 25000)
     // ==========================================
 
     let myChart = null; let assetChart = null; let incomeChart = null; let compareChart = null; let trendChart = null;
     let globalSnapshotData = []; 
     let globalTotalAssets = 0; 
 
-    // ==========================================
-    // 🟢 設定區：你想倒數的日子 (請在這裡增加/刪除)
-    // ==========================================
-    const MY_EVENTS = [
-        // 格式 1 (固定日期)：適合 "畢業"、"大考"、"退伍"
-        { title: "🎓 距離畢業", date: "2026-06-30", type: "fixed" },
-        
-        // 格式 2 (每年重複)：適合 "生日"、"跨年"、"聖誕節" (只需填 月-日)
-        // 程式會自動判斷是 "今年" 還是 "明年"
-        { title: "🎂 下次生日", date: "10-25", type: "yearly" },
-        { title: "🎄 聖誕節", date: "12-25", type: "yearly" },
-        
-        // 你可以複製上面一行，改成你想要的，例如：
-        // { title: "✈️ 日本旅遊", date: "2025-09-01", type: "fixed" },
-    ];
+    // --- 萬用日期格式化函式 (YYYY/MM/DD) ---
+    function formatDate(dateInput) {
+        if (!dateInput) return "";
+        try {
+            let d = new Date(dateInput);
+            
+            // 如果解析失敗 (Invalid Date)，嘗試手動解析 "YYYY/MM/DD" 字串
+            if (isNaN(d.getTime()) && typeof dateInput === 'string') {
+                let parts = dateInput.split(/[-/]/);
+                // 補全年份 (如果只有 MM/DD)
+                let y = parts.length === 3 ? parts[0] : new Date().getFullYear();
+                let m = parts.length === 3 ? parts[1] : parts[0];
+                let day = parts.length === 3 ? parts[2] : parts[1];
+                d = new Date(y, m - 1, day);
+            }
+
+            if (isNaN(d.getTime())) return dateInput; // 真的沒救了就回傳原字串
+
+            let yyyy = d.getFullYear();
+            let mm = String(d.getMonth() + 1).padStart(2, '0');
+            let dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}/${mm}/${dd}`;
+        } catch (e) {
+            return dateInput;
+        }
+    }
 
     window.onload = function() {
-        const d = new Date(); d.setDate(d.getDate() - 1); 
-        const yesterdayStr = d.toLocaleDateString('zh-TW', {year: 'numeric', month: '2-digit', day: '2-digit'});
-        
-        const titleEl = document.getElementById('dateTitle');
-        if(titleEl) titleEl.innerText = `📅 補打卡 (${yesterdayStr})`;
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0]; // 格式 YYYY-MM-DD
+        document.getElementById('habitDate').value = todayStr;
         
         loadChart();             
         loadAssetChart();        
@@ -565,30 +591,49 @@
         loadWishlist();
     };
 
-    // --- 功能 1：習慣打卡 ---
+    // --- 功能 1 ：習慣打卡 (抓取輸入框日期) ---
     function submitHabit() {
         const btn = document.getElementById('submitBtn');
         const msg = document.getElementById('statusMsg');
-        btn.innerText = "寫入中..."; btn.disabled = true;
+        
+        // 🟢 修改 2：抓取使用者選的日期
+        const dateVal = document.getElementById('habitDate').value;
+        
+        if (!dateVal) { alert("請選擇日期"); return; }
 
-        const d = new Date(); d.setDate(d.getDate() - 1);
-        const yesterdayStr = d.toLocaleDateString('zh-TW', {year: 'numeric', month: '2-digit', day: '2-digit'});
+        btn.innerText = "寫入中..."; 
+        btn.disabled = true;
 
         const payload = {
-            tab: "Habit_Log", date: yesterdayStr,
+            tab: "Habit_Log",
+            date: dateVal, // 直接傳送輸入框的值
             english: document.getElementById('checkEnglish').checked,
             exercise: document.getElementById('checkExercise').checked,
             reading: document.getElementById('checkReading').checked,
             sleeping: document.getElementById('checkSleeping').checked
         };
+
         fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
         .then(res => res.text()).then(data => {
-            if(data.includes("Success")) { btn.innerText = "✅ 完成"; msg.innerText = "紀錄成功！"; setTimeout(() => { loadChart(); btn.disabled = false; btn.innerText = "送出紀錄"; msg.innerText = ""; }, 1500); } 
-            else { alert("失敗：" + data); btn.disabled = false; }
+            if(data.includes("Success")) {
+                btn.innerText = "✅ 完成";
+                msg.innerText = "紀錄成功！";
+                // 成功後重新整理圖表
+                setTimeout(() => { 
+                    loadChart(); 
+                    btn.disabled = false; 
+                    btn.innerText = "送出紀錄"; 
+                    msg.innerText = ""; 
+                }, 1500);
+            } else { 
+                alert("失敗：" + data); 
+                btn.disabled = false; 
+                btn.innerText = "送出紀錄";
+            }
         });
     }
 
-    // --- 功能 2 (邏輯修正版)：習慣圖 ---
+    // --- 功能 2 ：習慣圖 ---
     function loadChart() {
         fetch(API_URL + "?tab=Habit_Log")
             .then(res => res.json())
@@ -800,12 +845,12 @@
             if(data.length === 0) { list.innerHTML = "<li style='color:#ccc'>無紀錄</li>"; return; }
             data.slice(-10).reverse().forEach(row => {
                 const color = row.收支 === "收入" ? "#4caf50" : "#e91e63"; const sign = row.收支 === "收入" ? "+" : "-";
-                list.innerHTML += `<li style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between;"><div><span style="font-weight:bold; color:#555;">${row.項目}</span><span style="font-size:0.85em; color:#999; margin-left:5px;">(${row.日期})</span><br><span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.類別}</span><span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.帳戶}</span></div><div style="font-weight:bold; color:${color};">${sign}$${row.金額}</div></li>`;
+                list.innerHTML += `<li style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between;"><div><span style="font-weight:bold; color:#555;">${row.項目}</span><span style="font-size:0.85em; color:#999; margin-left:5px;">(${row.日期})</span><br><span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">(${formatDate(row.日期)})${row.類別}</span><span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.帳戶}</span></div><div style="font-weight:bold; color:${color};">${sign}$${row.金額}</div></li>`;
             });
         });
     }
 
-    // --- 功能 7：支出比較 ---
+    // --- 功能 7 (預算監控版)：支出比較 + 預算進度條 ---
     function loadExpenseComparison() {
         fetch(API_URL + "?tab=Expenses_DB").then(res => res.json()).then(data => {
             if(data.length === 0) return;
@@ -813,30 +858,72 @@
             let lmYear = now.getFullYear(), lmMonth = now.getMonth(); if (lmMonth === 0) { lmYear -= 1; lmMonth = 12; } const lmKey = `${lmYear}/${lmMonth}`;
             const cats = ['食', '衣', '住', '行', '育樂', '其他'];
             let stats = { tm: { '食':0, '衣':0, '住':0, '行':0, '育樂':0, '其他':0, 'total': 0 }, lm: { '食':0, '衣':0, '住':0, '行':0, '育樂':0, '其他':0, 'total': 0 } };
+            
             data.forEach(row => {
                 if (row.收支 !== "支出") return; 
                 let d = new Date(row.日期); let rKey = !isNaN(d.getTime()) ? `${d.getFullYear()}/${d.getMonth()+1}` : "";
+                
+                // 日期防呆
+                if(typeof row.日期 === 'string' && row.日期.includes("/")) {
+                     let parts = row.日期.split("/");
+                     let y = parts.length===3 ? parts[0] : now.getFullYear();
+                     let m = parts.length===3 ? parts[1] : parts[0];
+                     rKey = `${y}/${parseInt(m)}`;
+                }
+
                 let c = cats.includes(row.類別) ? row.類別 : "其他"; let amt = Number(row.金額);
                 if (rKey === cmKey) { stats.tm[c]+=amt; stats.tm.total+=amt; } else if (rKey === lmKey) { stats.lm[c]+=amt; stats.lm.total+=amt; }
             });
+
+            // 1. 更新本月總支出數字
             document.getElementById('monthExpenseDisplay').innerText = "$" + stats.tm.total.toLocaleString();
+            
+            // ==========================================
+            // 🟢 2. 更新預算進度條 (Budget Logic)
+            // ==========================================
+            const currentExpense = stats.tm.total;
+            const remain = MONTHLY_BUDGET - currentExpense;
+            let percent = Math.round((currentExpense / MONTHLY_BUDGET) * 100);
+            
+            // 防止進度條爆出去
+            let barWidth = percent > 100 ? 100 : percent;
+
+            document.getElementById('budgetLimit').innerText = MONTHLY_BUDGET.toLocaleString();
+            document.getElementById('budgetPercent').innerText = percent + "%";
+            document.getElementById('budgetBar').style.width = barWidth + "%";
+            
+            const msgEl = document.getElementById('budgetMessage');
+            if (remain >= 0) {
+                msgEl.innerText = `✅ 還剩 $${remain.toLocaleString()} 可花`;
+                // 預算內顯示白色條
+                document.getElementById('budgetBar').style.backgroundColor = "#fff";
+            } else {
+                msgEl.innerText = `⚠️ 已超支 $${Math.abs(remain).toLocaleString()} !`;
+                // 超支顯示黃色警示 (在紅色背景上比較明顯)
+                document.getElementById('budgetBar').style.backgroundColor = "#ffeb3b";
+            }
+            // ==========================================
+
             document.getElementById('lastMonthTotalDisplay').innerText = "$" + stats.lm.total.toLocaleString();
             let diff = stats.tm.total - stats.lm.total;
             document.getElementById('totalDiff').innerHTML = diff > 0 ? `<span style="color:red">多花 $${diff.toLocaleString()}</span>` : `<span style="color:green">省下 $${Math.abs(diff).toLocaleString()}</span>`;
+            
             const ctx = document.getElementById('expenseCompareChart'); if(compareChart) compareChart.destroy();
             compareChart = new Chart(ctx, { type: 'bar', data: { labels: cats, datasets: [{ label: '本月', data: cats.map(c=>stats.tm[c]), backgroundColor: '#36a2eb' }, { label: '上月', data: cats.map(c=>stats.lm[c]), backgroundColor: '#ff6384' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } } });
+            
             const body = document.getElementById('compareTableBody'); body.innerHTML = "";
             cats.forEach(c => { let v1 = stats.tm[c], v2 = stats.lm[c], d = v1-v2, dStr = d > 0 ? `<span style="color:red">▲ ${d}</span>` : (d<0 ? `<span style="color:green">▼ ${Math.abs(d)}</span>` : "-"); body.innerHTML += `<tr><td style="padding:8px;font-weight:bold">${c}</td><td>$${v1}</td><td style="color:#888">$${v2}</td><td>${dStr}</td></tr>`; });
         });
     }
 
-    // --- 功能 8 (收入分析) ---
+    // --- 功能 8 (顯示版)：每月收入來源分析 ---
 
     function loadMonthlyIncome() {
         fetch(API_URL + "?tab=Asset_Log")
             .then(res => res.json())
             .then(data => {
                 if(data.length === 0) return;
+
                 let monthlyData = {}; 
 
                 data.forEach(row => {
@@ -889,6 +976,29 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        // 🟢 關鍵修改 1：互動模式
+                        interaction: {
+                            mode: 'index',      // 只要滑鼠在該月份的 X 軸上，就顯示所有數據
+                            intersect: false,   // 不用精準指到色塊也能觸發
+                        },
+                        // 🟢 關鍵修改 2：優化提示框 (加上 $ 符號和千分位)
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            // 變成 $12,345 格式
+                                            label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 }).format(context.parsed.y);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
                         scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
                     }
                 });
@@ -931,7 +1041,7 @@
             let groupedData = {};
             let allDates = new Set();
             
-            // 🟢 專門給預測用的陣列
+            // 專門給預測用的陣列
             let totalAssetRecords = []; 
 
             histData.forEach(r => {
@@ -1095,7 +1205,7 @@
         });
     }
 
-    // --- 功能 12：批次寫入快照 ---
+    // --- 🟢 功能 12：批次寫入快照  ---
     function snapshotAssets() {
         if(!globalSnapshotData || globalSnapshotData.length === 0) { 
             alert("資產數據載入中，請稍後再試"); 
@@ -1107,8 +1217,17 @@
 
         const today = new Date().toISOString().split('T')[0];
         
+        // 準備二維陣列資料
         let rowsToSend = globalSnapshotData.map(item => {
-            return [today, item.item, item.qty, item.mv, item.cost];
+            let finalName = item.item;
+            
+            // 🟢 關鍵修正：如果名稱是 "0" 開頭的數字 (例如 0050)，前面加單引號
+            // 這樣 Excel 才會把它當成文字，保留前面的 0
+            if (String(finalName).startsWith("0") && !isNaN(finalName)) {
+                finalName = "'" + finalName;
+            }
+
+            return [today, finalName, item.qty, item.mv, item.cost];
         });
 
         const payload = {
@@ -1120,7 +1239,7 @@
         .then(res => res.text())
         .then(data => {
             if(data.includes("Success")) {
-                alert("📸 成功紀錄所有資產的詳細快照！");
+                alert("📸 成功紀錄！");
                 btn.innerText = "📸 紀錄本月詳細快照";
                 btn.disabled = false;
                 loadTrendChart();
@@ -1198,9 +1317,9 @@
         });
     }
 
-    // --- 🟢 功能 16 (動態版)：從 Excel 讀取倒數事件 ---
+    // --- 🟢 功能 16：時間倒數小工具 ---
     function loadTimeWidget() {
-        // 1. 先畫年度進度條 (這個是固定的)
+        // 1. 先畫年度進度條
         const container = document.getElementById('timeContainer');
         if(!container) return;
         
@@ -1226,7 +1345,6 @@
         fetch(API_URL + "?tab=Events_DB")
             .then(res => res.json())
             .then(data => {
-                // 如果 Excel 沒資料，就只顯示年度進度
                 if(data.length === 0) {
                     container.innerHTML = html + "<div style='text-align:center; font-size:0.8em; opacity:0.7; margin-top:10px;'>尚無倒數事件</div>";
                     return;
@@ -1234,39 +1352,38 @@
 
                 data.forEach(event => {
                     let targetDate;
-                    let dateDisplay = "";
-                    let evtTitle = event['事件名稱'] || event['title']; // 相容不同標題寫法
+                    let evtTitle = event['事件名稱'] || event['title']; 
                     let evtDate = event['日期'] || event['date'];
                     let evtType = event['類型'] || event['type'];
 
-                    // 處理日期格式 (Excel有時會傳回完整時間字串)
-                    // 我們只取前10碼 (YYYY-MM-DD) 或者原始字串
+                    // 日期字串處理
                     let dateStr = String(evtDate).replace(/\//g, "-").split("T")[0];
 
                     if (evtType === "fixed") {
                         // 固定日期
                         targetDate = new Date(dateStr);
-                        dateDisplay = dateStr;
                     } else {
-                        // 每年重複 (MM-DD)
-                        // 如果 Excel 傳回來是 2025-10-25，我們切字串取後面的 10-25
+                        // 每年重複 (處理 10-25 或 2025-10-25)
                         let shortDate = dateStr.includes("-") ? dateStr.slice(-5) : dateStr; 
                         const [m, d] = shortDate.split('-');
                         targetDate = new Date(currentYear, m - 1, d);
                         if (now > targetDate) targetDate.setFullYear(currentYear + 1);
-                        dateDisplay = targetDate.toLocaleDateString('zh-TW');
                     }
 
+                    // 計算剩餘天數
                     const diffTime = targetDate - now;
                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-                    if (diffDays < 0 && evtType === "fixed") return; // 過期不顯示
+                    if (diffDays < 0 && evtType === "fixed") return; 
+
+                    // 🟢 關鍵修正：使用 formatDate() 統一顯示格式 (YYYY/MM/DD)
+                    let displayDate = formatDate(targetDate);
 
                     html += `
                         <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.1); padding:10px 15px; border-radius:10px;">
                             <div>
                                 <div style="font-size:0.85em; opacity:0.8;">${evtTitle}</div>
-                                <div style="font-size:1.1em; font-weight:bold;">${dateDisplay}</div>
+                                <div style="font-size:1.1em; font-weight:bold;">${displayDate}</div>
                             </div>
                             <div style="text-align:right;">
                                 <div style="font-size:0.85em; opacity:0.8;">還剩下</div>
@@ -1320,7 +1437,7 @@
         });
     }
 
-    // --- 功能 18 (優化版)：夢想購物車 (購買後自動隱藏) ---
+    // --- 功能 18：夢想購物車 (購買後自動隱藏) ---
     function loadWishlist() {
         const livingEl = document.getElementById('livingFundsDisplay');
         let livingText = livingEl ? livingEl.innerText : "0";
