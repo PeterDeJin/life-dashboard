@@ -10,7 +10,7 @@
     
     <title>My Life Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="config.js"></script> 
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <style>
         /* 全域設定：禁止選取文字 (像 App 質感) */
         body { 
@@ -545,6 +545,13 @@
     const MONTHLY_BUDGET = 15000; // 每月總預算 (例如 25000)
     // ==========================================
 
+    // ==========================================
+    // 🟢 新增：圖表標籤設定 (預設全關，只在圓餅圖開)
+    // ==========================================
+    Chart.register(ChartDataLabels);
+    Chart.defaults.set('plugins.datalabels', { display: false }); 
+    // ==========================================
+
     let myChart = null; let assetChart = null; let incomeChart = null; let compareChart = null; let trendChart = null;
     let globalSnapshotData = []; 
     let globalTotalAssets = 0; 
@@ -734,7 +741,7 @@
         });
     }
 
-    // --- 功能 4 (黃金成本+股票成本) ---
+    // --- 功能 4 (百分比專用版)：計算 ROI + 圓餅圖顯示 % ---
     function loadAssetChart() {
         Promise.all([
             fetch(API_URL + "?tab=Portfolio").then(res => res.json()),
@@ -745,63 +752,41 @@
             let labels = [], values = [], colors = [];
             const palette = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#E7E9ED', '#76D7C4', '#F1948A'];
             
-            // 1. 獨立計算「總投資成本」 (直接跑流水帳，不依賴 Portfolio 對應)
-            let totalInvestCost = 0;
-            let costMap = {}; // 這是給快照用的個別成本
-
+            // 1. 建立成本對照表
+            let costMap = {};
             logData.forEach(row => {
-                let cat = row.資產類別 || row.類別 || ""; 
-                let item = row.項目名稱 || row.項目 || ""; 
-                let type = row.交易型態 || row.型態 || row.收支 || ""; 
-                let amt = Number(row.金額);
-
-                // 條件：只要是「股票」、「加密貨幣」或項目包含「黃金、BTC」
-                // 且排除「現金」類別 (避免重複計算轉帳)
-                if ((cat.includes("股票") || cat.includes("Stock") || cat.includes("加密貨幣") || 
-                     item.includes("黃金") || item.includes("BTC")) && !cat.includes("現金")) {
-                    
-                    // 計算總成本
-                    if (type.includes("流入") || type.includes("買入")) {
-                        totalInvestCost += Math.abs(amt); 
-                        if(!costMap[item]) costMap[item] = 0;
-                        costMap[item] += Math.abs(amt);
-                    } 
-                    else if (type.includes("流出") || type.includes("賣出")) {
-                        totalInvestCost -= Math.abs(amt); 
-                        if(!costMap[item]) costMap[item] = 0;
-                        costMap[item] -= Math.abs(amt);
-                    }
+                let cat = row.資產類別||"", item = row.項目名稱||row.項目||"", type = row.交易型態||row.型態||"", amt = Number(row.金額);
+                if ((cat.includes("股票") || cat.includes("Stock") || item.includes("黃金") || item.includes("BTC")) && !cat.includes("現金")) {
+                    if(!costMap[item]) costMap[item] = 0;
+                    if (type.includes("流入") || type.includes("買入")) costMap[item] += Math.abs(amt); 
+                    else if (type.includes("流出") || type.includes("賣出")) costMap[item] -= Math.abs(amt); 
                 }
             });
 
-            if (totalInvestCost < 0) totalInvestCost = 0; // 防呆
-
-            // 2. 處理 Portfolio (計算現值 & 準備快照)
             globalSnapshotData = []; 
+            let totalInvestCost = 0;
 
             portfolioData.forEach((row, i) => {
                 let itemName = row['項目名稱'];
                 let mv = Number(row['總市值 (MarketValue)'] || row['總市值'] || 0);
                 let qty = row['持有數量/金額'] || row['持有數量'] || 0;
-                let cost = costMap[itemName] || 0; // 這裡只為了存快照，不影響總成本計算
+                let cost = costMap[itemName] || 0;
 
-                // A. 畫圓餅圖 (只畫市值 > 0)
                 if (mv > 0) {
                     currentMarketValue += mv;
                     labels.push(itemName); values.push(mv); colors.push(palette[i % palette.length]);
                 }
 
-                // B. 打包快照資料
                 if (mv > 0 || (row['資產類別'] && row['資產類別'].includes('股票'))) {
+                    if(itemName.match(/00|黃金|BTC|ETH|Stock/)) totalInvestCost += cost;
                     globalSnapshotData.push({ item: itemName, qty: qty, mv: mv, cost: cost });
                 }
             });
             
-            // 補上總結
             globalSnapshotData.push({ item: "總資產", qty: 1, mv: currentMarketValue, cost: totalInvestCost });
             globalTotalAssets = currentMarketValue;
 
-            // 3. 更新進度條 & 數據
+            // 更新進度條
             let percent = Math.min(100, Math.round((currentMarketValue / SAVING_GOAL) * 100));
             const progBar = document.getElementById('goalProgressBar');
             if(progBar) {
@@ -822,9 +807,40 @@
             rEl.innerText = (roi >= 0 ? "+" : "") + roi.toFixed(2) + "%";
             rEl.style.color = roi >= 0 ? "#ff9999" : "#99ff99";
 
+            // --- 畫圓餅圖 ---
             const ctx = document.getElementById('assetPieChart');
             if(assetChart) assetChart.destroy();
-            assetChart = new Chart(ctx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: values, backgroundColor: colors }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } } });
+            
+            assetChart = new Chart(ctx, { 
+                type: 'doughnut', 
+                data: { 
+                    labels: labels, 
+                    datasets: [{ data: values, backgroundColor: colors }] 
+                }, 
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { position: 'right' },
+                        // 🟢 這裡針對圓餅圖「開啟」標籤顯示
+                        datalabels: {
+                            display: true, // 只有這裡設為 true
+                            color: '#fff',
+                            font: { weight: 'bold', size: 11 },
+                            formatter: (value, ctx) => {
+                                let sum = 0;
+                                let dataArr = ctx.chart.data.datasets[0].data;
+                                dataArr.map(data => { sum += data; });
+                                let percentage = (value * 100 / sum).toFixed(1) + "%";
+                                
+                                // 佔比太小 (<3%) 隱藏不顯示，避免重疊
+                                if((value * 100 / sum) < 3) return ""; 
+                                return percentage;
+                            }
+                        }
+                    } 
+                } 
+            });
         });
     }
 
