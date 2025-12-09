@@ -177,8 +177,33 @@
         </div>
 
         <div class="card">
-            <h2>📝 最近紀錄</h2>
-            <ul id="expenseList" style="list-style: none; padding: 0; max-height: 300px; overflow-y: auto;"></ul>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h2 style="margin:0;">📝 最近紀錄</h2>
+                <select id="recordFilter" onchange="renderExpenseList()" style="padding:5px; border-radius:5px; border:1px solid #ddd; background:#f9f9f9; font-size:0.85em;">
+                    <option value="ALL">全部顯示</option>
+                    <optgroup label="📂 依類別">
+                        <option value="CAT_食">食</option>
+                        <option value="CAT_衣">衣</option>
+                        <option value="CAT_住">住</option>
+                        <option value="CAT_行">行</option>
+                        <option value="CAT_育樂">育樂</option>
+                        <option value="CAT_其他">其他</option>
+                    </optgroup>
+                    <optgroup label="💳 依帳戶">
+                        <option value="ACC_錢包">錢包</option>
+                        <option value="ACC_中國信託">中國信託</option>
+                        <option value="ACC_郵局">郵局</option>
+                        <option value="ACC_富邦銀行">富邦銀行</option>
+                        <option value="ACC_悠遊卡">悠遊卡</option>
+                        <option value="ACC_icash">icash</option>
+                        <option value="ACC_ipassmoney">iPass Money</option>
+                        <option value="ACC_待付款">待付款</option>
+                    </optgroup>
+                </select>
+            </div>
+            <ul id="expenseList" style="list-style: none; padding: 0; max-height: 300px; overflow-y: auto;">
+                <li style="color:#888;">載入中...</li>
+            </ul>
         </div>
     </div>
 
@@ -361,6 +386,7 @@
     let globalSnapshotData = []; 
     let globalTotalAssets = 0; 
     let globalLivingFunds = 0;
+    let globalExpensesData = [];
 
     // --- 萬用日期格式化函式 (YYYY/MM/DD) ---
     function formatDate(dateInput) {
@@ -634,16 +660,71 @@
         });
     }
 
-    // --- 功能 6：讀取記帳列表 ---
+    // --- 功能 6 (升級版)：讀取記帳列表 + 篩選功能 ---
+    
+    // 下載資料並存入全域變數
     function loadExpenses() {
         fetch(API_URL + "?tab=Expenses_DB").then(res => res.json()).then(data => {
-            const list = document.getElementById('expenseList'); list.innerHTML = ""; 
-            if(data.length === 0) { list.innerHTML = "<li style='color:#ccc'>無紀錄</li>"; return; }
-            data.slice(-10).reverse().forEach(row => {
-                const color = row.收支 === "收入" ? "#4caf50" : "#e91e63"; 
-                const sign = row.收支 === "收入" ? "+" : "-";
-                list.innerHTML += `<li style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between;"><div><span style="font-weight:bold; color:#555;">${row.項目}</span><span style="font-size:0.85em; color:#999; margin-left:5px;">(${formatDate(row.日期)})</span><br><span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.類別}</span><span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.帳戶}</span></div><div style="font-weight:bold; color:${color};">${sign}$${row.金額}</div></li>`;
-            });
+            // 1. 存起來，這樣切換篩選時不用重新下載
+            globalExpensesData = data;
+            
+            // 2. 初始顯示 (預設顯示全部)
+            renderExpenseList();
+        });
+    }
+
+    // 根據下拉選單的條件，過濾並畫出列表
+    function renderExpenseList() {
+        const list = document.getElementById('expenseList'); 
+        const filterVal = document.getElementById('recordFilter').value; // 抓取選擇的值 (例如 "CAT_食" 或 "ACC_錢包")
+        
+        list.innerHTML = ""; 
+        
+        if(globalExpensesData.length === 0) { 
+            list.innerHTML = "<li style='color:#ccc'>無紀錄</li>"; 
+            return; 
+        }
+
+        // --- 核心篩選邏輯 ---
+        let filteredData = globalExpensesData.filter(row => {
+            if (filterVal === "ALL") return true; // 全部都過
+            
+            // 如果選的是「類別」(開頭是 CAT_)
+            if (filterVal.startsWith("CAT_")) {
+                let target = filterVal.replace("CAT_", "");
+                return row.類別 === target;
+            }
+            
+            // 如果選的是「帳戶」(開頭是 ACC_)
+            if (filterVal.startsWith("ACC_")) {
+                let target = filterVal.replace("ACC_", "");
+                return row.帳戶 === target;
+            }
+            return true;
+        });
+
+        // 取最後 10 筆並反轉 (讓最新的在上面)
+        const displayData = filteredData.slice(-10).reverse();
+
+        if (displayData.length === 0) {
+            list.innerHTML = "<li style='color:#ccc; text-align:center; padding:10px;'>此條件下無紀錄</li>";
+            return;
+        }
+
+        displayData.forEach(row => {
+            const color = row.收支 === "收入" ? "#4caf50" : "#e91e63"; 
+            const sign = row.收支 === "收入" ? "+" : "-";
+            list.innerHTML += `
+                <li style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">
+                    <div>
+                        <span style="font-weight:bold; color:#555;">${row.項目}</span>
+                        <span style="font-size:0.85em; color:#999; margin-left:5px;">(${formatDate(row.日期)})</span>
+                        <br>
+                        <span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.類別}</span>
+                        <span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.帳戶}</span>
+                    </div>
+                    <div style="font-weight:bold; color:${color};">${sign}$${Number(row.金額).toLocaleString()}</div>
+                </li>`;
         });
     }
 
