@@ -12,479 +12,279 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <style>
-        /* 全域設定：禁止選取文字 (像 App 質感) */
-        body { 
-            font-family: '微軟正黑體', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
-            background: #f4f7f6; 
-            padding: 15px; /* 手機版邊距縮小 */
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            -webkit-user-select: none; 
-            user-select: none; 
-            margin: 0; /* 清除預設邊距 */
-        }
-
-        .container { 
-            max-width: 800px; 
-            width: 100%; 
-            padding-bottom: 80px; /* 底部留白給手指滑動 */
-        }
+        body { font-family: '微軟正黑體', sans-serif; background: #f4f7f6; padding: 15px; display: flex; flex-direction: column; align-items: center; -webkit-user-select: none; user-select: none; margin: 0; padding-bottom: 80px; }
+        .container { max-width: 800px; width: 100%; }
         
-        .card { 
-            background: white; 
-            padding: 20px; 
-            border-radius: 15px; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* 陰影柔和一點 */
-            margin-bottom: 20px; 
-            transition: transform 0.2s; /* 點擊時的小動畫 */
-        }
-
-        /* 區塊顏色樣式 */
+        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .full-width { width: 100%; box-sizing: border-box; }
         .check-in-box { background: linear-gradient(135deg, #e0f7fa 0%, #ffffff 100%); border: 2px solid #b2ebf2; }
         
-        /* 輸入框通用樣式 */
         .asset-form { display: flex; flex-direction: column; gap: 15px; }
-        .asset-form label { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            font-weight: bold; 
-            color: #555; 
-            font-size: 0.95rem; /* 手機字體微調 */
-        }
-        
-        /* 讓輸入框在手機上更好點擊 */
-        .asset-form input, .asset-form select { 
-            padding: 10px; 
-            border-radius: 8px; 
-            border: 1px solid #ddd; 
-            width: 55%; 
-            font-size: 16px; /* 防止 iPhone 自動放大 */
-            background: #f9f9f9;
-        }
+        .asset-form label { display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: #555; font-size: 0.95rem; }
+        .asset-form input, .asset-form select { padding: 10px; border-radius: 8px; border: 1px solid #ddd; width: 55%; font-size: 16px; background: #f9f9f9; }
 
-        /* 按鈕樣式：更像 App 的按鈕 */
-        button { 
-            border: none; 
-            padding: 12px 25px; 
-            border-radius: 50px; 
-            font-size: 1rem; 
-            cursor: pointer; 
-            transition: 0.2s; 
-            color: white; 
-            font-weight: bold;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
+        button { border: none; padding: 12px 25px; border-radius: 50px; font-size: 1rem; cursor: pointer; transition: 0.2s; color: white; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         button:active { transform: scale(0.96); }
         button:disabled { background: #ccc !important; box-shadow: none; }
 
-        /* Checkbox 優化 */
         .checkbox-group { display: flex; gap: 12px; margin: 15px 0; flex-wrap: wrap; }
-        .checkbox-group label { 
-            font-size: 1rem; 
-            cursor: pointer; 
-            display: flex; 
-            align-items: center; 
-            background: rgba(255,255,255,0.6);
-            padding: 5px 10px;
-            border-radius: 20px;
-        }
+        .checkbox-group label { font-size: 1rem; cursor: pointer; display: flex; align-items: center; background: rgba(255,255,255,0.6); padding: 5px 10px; border-radius: 20px; }
         .checkbox-group input { width: 22px; height: 22px; margin-right: 8px; }
 
-        /* 進度條 */
         .progress-container { width: 100%; background-color: rgba(255,255,255,0.3); border-radius: 10px; margin-top: 15px; height: 8px; overflow: hidden; }
         .progress-bar { height: 100%; background-color: #4ade80; width: 0%; transition: width 1s ease-in-out; }
 
-        /* ========================================= */
-        /* 📱 關鍵修改：響應式 Grid 排版 (Responsive) */
-        /* ========================================= */
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; }
         
-        /* 預設 (電腦版)：維持兩欄 */
-        .grid-container {
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 20px; 
-            width: 100%;
+        /* 📱 底部導覽列 */
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: white; border-top: 1px solid #ddd;
+            display: flex; justify-content: space-around; padding: 10px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 1000;
         }
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center;
+            font-size: 0.8rem; color: #888; background: none; border: none; padding: 0; box-shadow: none;
+        }
+        .nav-item span { font-size: 1.5rem; margin-bottom: 2px; }
+        .nav-item.active { color: #2a5298; font-weight: bold; }
 
-        /* 📱 手機版 (螢幕寬度 < 768px)：強制變單欄 */
+        .view-section { display: none; animation: fadeIn 0.3s; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
         @media (max-width: 768px) {
-            .grid-container {
-                grid-template-columns: 1fr !important; /* 強制變成一欄 */
-            }
-            
-            /* 手機上的輸入框改為上下排列，比較好按 */
-            .asset-form label {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 5px;
-            }
-            .asset-form input, .asset-form select {
-                width: 100%; /* 寬度佔滿 */
-                box-sizing: border-box; /* 防止爆版 */
-            }
-
-            /* 隱藏部分不重要的手機裝飾 */
-            h1 { font-size: 1.5rem; margin-bottom: 15px; }
-            
-            /* 調整卡片內距 */
-            .card { padding: 15px; }
-            
-            /* 總資產數字縮小一點以免換行 */
+            .grid-container { grid-template-columns: 1fr !important; }
+            .asset-form label { flex-direction: column; align-items: flex-start; gap: 5px; }
+            .asset-form input, .asset-form select { width: 100%; box-sizing: border-box; }
+            h1 { display: none; } 
             #totalAssetsDisplay { font-size: 2.8rem !important; }
-            
-            /* ROI 那三個小框框改為直排或縮小間距 */
-            .roi-box {
-                flex-direction: row; 
-                justify-content: space-around;
-                gap: 10px !important;
-            }
-            .roi-item div:first-child { font-size: 0.8rem; } /* 標題變小 */
-            .roi-item div:last-child { font-size: 1.1rem !important; } /* 數字變小 */
+            .roi-box { flex-direction: row; justify-content: space-around; gap: 10px !important; }
+            .roi-item div:first-child { font-size: 0.8rem; }
+            .roi-item div:last-child { font-size: 1.1rem !important; }
         }
     </style>
 </head>
 <body>
 
+<nav class="bottom-nav">
+    <button class="nav-item active" onclick="switchTab('home')"><span>🏠</span>首頁</button>
+    <button class="nav-item" onclick="switchTab('expenses')"><span>💸</span>記帳</button>
+    <button class="nav-item" onclick="switchTab('assets')"><span>💰</span>資產</button>
+    <button class="nav-item" onclick="switchTab('more')"><span>🍔</span>更多</button>
+</nav>
+
 <div class="container">
+    <h1 style="text-align:center; margin-bottom:20px;">🚀 My Life Dashboard</h1>
 
-    <div class="card full-width" style="background: linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%); color: white; padding: 20px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h2 style="margin:0; font-size: 1.1rem; opacity: 0.9;">⏳ 時間倒數</h2>
-            <button onclick="toggleEventForm()" style="background: rgba(255,255,255,0.2); font-size: 0.8rem; padding: 5px 10px; border:1px solid rgba(255,255,255,0.5);">＋ 新增</button>
-        </div>
-
-        <div id="eventForm" style="display:none; background:rgba(0,0,0,0.2); padding:15px; border-radius:10px; margin-bottom:15px; flex-direction:column; gap:10px;">
-            <label style="font-size:0.9em;">事件名稱</label>
-            <input type="text" id="evtTitle" placeholder="例如：畢業、出國" style="width:100%; padding:8px; border-radius:5px; border:none;">
-            
-            <label style="font-size:0.9em;">日期 (YYYY-MM-DD 或 MM-DD)</label>
-            <input type="text" id="evtDate" placeholder="2026-06-30 或 10-25" style="width:100%; padding:8px; border-radius:5px; border:none;">
-            
-            <label style="font-size:0.9em;">類型</label>
-            <select id="evtType" style="width:100%; padding:8px; border-radius:5px; border:none;">
-                <option value="fixed">一次性 (固定年份)</option>
-                <option value="yearly">每年重複 (生日/節慶)</option>
-            </select>
-            
-            <button onclick="submitEvent()" style="background: #4ca1af; color: white; margin-top:5px;">確認新增</button>
-        </div>
+    <div id="view-home" class="view-section active">
         
-        <div id="timeContainer" style="display: flex; flex-direction: column; gap: 15px;">
-            載入中...
+        <div class="card full-width" style="background: linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%); color: white; padding: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h2 style="margin:0; font-size: 1.1rem; opacity: 0.9;">⏳ 時間倒數</h2>
+                <button onclick="toggleEventForm()" style="background: rgba(255,255,255,0.2); font-size: 0.8rem; padding: 5px 10px; border:1px solid rgba(255,255,255,0.5);">＋</button>
+            </div>
+            <div id="eventForm" style="display:none; background:rgba(0,0,0,0.2); padding:15px; border-radius:10px; margin-bottom:15px; flex-direction:column; gap:10px;">
+                <input type="text" id="evtTitle" placeholder="名稱" style="padding:8px; border-radius:5px; border:none;">
+                <input type="text" id="evtDate" placeholder="日期 (YYYY-MM-DD)" style="padding:8px; border-radius:5px; border:none;">
+                <select id="evtType" style="padding:8px; border-radius:5px; border:none;"><option value="fixed">一次性</option><option value="yearly">每年重複</option></select>
+                <button onclick="submitEvent()" style="background: #4ca1af; color: white;">新增</button>
+            </div>
+            <div id="timeContainer" style="display: flex; flex-direction: column; gap: 15px;">載入中...</div>
+        </div>
+
+        <div class="card check-in-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 id="dateTitle" style="margin:0; font-size: 1.2rem;">📅 今天打卡</h2>
+                <input type="date" id="habitDate" style="border: 1px solid #b2ebf2; padding: 5px 10px; border-radius: 8px; background: rgba(255,255,255,0.8); font-weight: bold; color: #00796b; width: auto;">
+            </div>
+            <div class="checkbox-group">
+                <label><input type="checkbox" id="checkEnglish"> 英文</label>
+                <label><input type="checkbox" id="checkExercise"> 運動習慣</label>
+                <label><input type="checkbox" id="checkReading"> 讀書習慣</label>
+                <label><input type="checkbox" id="checkSleeping"> 睡覺習慣</label>
+            </div>
+            <button onclick="submitHabit()" id="submitBtn" style="background: #00897b; width:100%;">送出紀錄</button>
+            <span id="statusMsg" style="margin-left: 10px; color: #666;"></span>
+        </div>
+
+        <div class="card">
+            <h2>📈 能力成長曲線</h2>
+            <canvas id="habitChart"></canvas>
         </div>
     </div>
 
-    <div class="grid-container">
-        <div class="card" style="background: linear-gradient(135deg, #388e3c 0%, #81c784 100%); color: white; text-align: center; padding: 20px;">
-            <h2 style="margin:0; font-size: 1.1rem; opacity: 0.9;">💸 生活可用資金</h2>
-            <div id="livingFundsDisplay" style="font-size: 2.5rem; font-weight: bold; margin: 5px 0;">計算中...</div>
-            <div style="font-size: 0.85rem; opacity: 0.8;">(不含投資帳戶)</div>
-        </div>
-        <div class="card" style="background: linear-gradient(135deg, #e53935 0%, #e57373 100%); color: white; text-align: center; padding: 20px;">
-            <h2 style="margin:0; font-size: 1.1rem; opacity: 0.9;">📉 本月總支出</h2>
-            <div id="monthExpenseDisplay" style="font-size: 2.5rem; font-weight: bold; margin: 5px 0;">計算中...</div>
-            
-            <div style="margin-top: 15px;">
-                <div style="display:flex; justify-content:space-between; font-size:0.85em; opacity:0.9; margin-bottom:5px;">
-                    <span>預算: $<span id="budgetLimit">0</span></span>
-                    <span id="budgetPercent">0%</span>
-                </div>
-                <div style="width:100%; background:rgba(255,255,255,0.3); border-radius:10px; height:8px; overflow:hidden;">
-                    <div id="budgetBar" style="height:100%; background:#fff; width:0%; transition:width 1s ease-in-out;"></div>
-                </div>
-                <div id="budgetMessage" style="font-size:0.9em; margin-top:8px; font-weight:bold; text-align:right;">
-                    計算中...
+    <div id="view-expenses" class="view-section">
+        
+        <div class="grid-container">
+            <div class="card" style="background: linear-gradient(135deg, #388e3c 0%, #81c784 100%); color: white; text-align: center; padding: 20px;">
+                <h2 style="margin:0; font-size: 1rem; opacity: 0.9;">💸 生活可用</h2>
+                <div id="livingFundsDisplay" style="font-size: 2rem; font-weight: bold;">...</div>
+            </div>
+            <div class="card" style="background: linear-gradient(135deg, #e53935 0%, #e57373 100%); color: white; text-align: center; padding: 20px;">
+                <h2 style="margin:0; font-size: 1rem; opacity: 0.9;">📉 本月已花</h2>
+                <div id="monthExpenseDisplay" style="font-size: 2rem; font-weight: bold;">...</div>
+                
+                <div style="margin-top: 10px;">
+                    <div style="display:flex; justify-content:space-between; font-size:0.8em; opacity:0.9;"><span>預算 $<span id="budgetLimit">0</span></span><span id="budgetPercent">0%</span></div>
+                    <div style="width:100%; background:rgba(255,255,255,0.3); border-radius:10px; height:6px; overflow:hidden; margin-top:5px;">
+                        <div id="budgetBar" style="height:100%; background:#fff; width:0%;"></div>
+                    </div>
+                    <div id="budgetMessage" style="font-size:0.8em; margin-top:5px; font-weight:bold; text-align:right;">計算中...</div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="grid-container">
         <div class="card">
             <h2>💸 日常記帳</h2>
             <div class="asset-form">
                 <label>日期：<input type="date" id="expDate"></label>
-                <label>收支：
-                    <select id="expType">
-                        <option value="支出">支出 (Expense)</option>
-                        <option value="收入">收入 (Income)</option>
-                    </select>
-                </label>
+                <label>收支：<select id="expType"><option value="支出">支出</option><option value="收入">收入</option></select></label>
                 <label>帳戶：
                     <select id="expAccount">
-                        <option value="錢包">現金錢包</option>
-                        <option value="中國信託">中國信託</option>
-                        <option value="悠遊卡">悠遊卡</option>
-                        <option value="icash">icash</option>
-                        <option value="ipassmoney">iPass Money</option>
-                        <option value="學生證">學生證</option>
-                        <option value="一卡通">一卡通</option>
-                        <option value="待付款">⚠️ 待付款 (欠別人的)</option>
+                        <option value="錢包">現金錢包</option><option value="中國信託">中國信託</option><option value="悠遊卡">悠遊卡</option><option value="icash">icash</option><option value="ipassmoney">iPass Money</option><option value="學生證">學生證</option><option value="一卡通">一卡通</option><option value="待付款">⚠️ 待付款</option>
                     </select>
                 </label>
-                <label>類別：
-                    <select id="expCategory">
-                        <option value="食">食</option>
-                        <option value="衣">衣</option>
-                        <option value="住">住</option>
-                        <option value="行">行</option>
-                        <option value="育樂">育樂</option>
-                        <option value="其他">其他</option>
-                    </select>
-                </label>
-                <label>項目：<input type="text" id="expItem" placeholder="如: 午餐, 代墊"></label>
+                <label>類別：<select id="expCategory"><option value="食">食</option><option value="衣">衣</option><option value="住">住</option><option value="行">行</option><option value="育樂">育樂</option><option value="其他">其他</option></select></label>
+                <label>項目：<input type="text" id="expItem" placeholder="如: 午餐"></label>
                 <label>金額：<input type="number" id="expAmount" placeholder="100"></label>
-                <button onclick="submitExpense()" id="btnExp" style="margin-top: 10px; background: #e91e63;">記一筆</button>
+                <button onclick="submitExpense()" id="btnExp" style="background: #e91e63; width:100%;">記一筆</button>
+            </div>
+        </div>
+
+        <div class="card" style="border-left: 5px solid #9c27b0;">
+            <h2>🔄 轉帳 / 領錢</h2>
+            <div class="asset-form">
+                <label>日期：<input type="date" id="transDate"></label>
+                <div style="display:flex; gap:10px;">
+                    <select id="transFrom" style="width:100%"><option value="郵局">郵局</option><option value="富邦銀行">富邦</option><option value="中國信託">中信</option><option value="錢包">錢包</option></select>
+                    <span>➡</span>
+                    <select id="transTo" style="width:100%"><option value="錢包">錢包</option><option value="悠遊卡">悠遊卡</option><option value="待付款">還債</option><option value="富邦證券">證券</option></select>
+                </div>
+                <label>金額：<input type="number" id="transAmount" placeholder="1000"></label>
+                <button onclick="submitTransfer()" id="btnTrans" style="background: #9c27b0; width:100%;">確認</button>
+            </div>
+        </div>
+
+        <div class="card full-width">
+            <h2>📊 本月 vs 上月</h2>
+            <div style="height: 250px;"><canvas id="expenseCompareChart"></canvas></div>
+            <div style="margin-top:15px; font-size:0.9em;">
+                <div style="padding:8px; background:#fce4ec; border-radius:5px; color:#c2185b; margin-bottom:5px;">📅 上月總支出：<b id="lastMonthTotalDisplay">...</b></div>
+                <div style="padding:8px; background:#fff3cd; border-radius:5px; color:#856404;">💡 差異：<b id="totalDiff">...</b></div>
             </div>
         </div>
 
         <div class="card">
-            <h2>📝 最近 10 筆紀錄</h2>
-            <ul id="expenseList" style="list-style: none; padding: 0; max-height: 400px; overflow-y: auto;">
-                <li style="color: #888;">載入中...</li>
-            </ul>
+            <h2>📝 最近紀錄</h2>
+            <ul id="expenseList" style="list-style: none; padding: 0; max-height: 300px; overflow-y: auto;"></ul>
         </div>
     </div>
 
-    <div class="card full-width">
-        <h2>📊 本月 vs 上月 支出比較</h2>
-        <div class="grid-container">
-            <div style="height: 300px;"><canvas id="expenseCompareChart"></canvas></div>
-            <div>
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
-                    <thead>
-                        <tr style="border-bottom: 2px solid #ddd; text-align: left;">
-                            <th style="padding: 8px;">類別</th>
-                            <th style="padding: 8px; color: #36a2eb;">本月</th>
-                            <th style="padding: 8px; color: #ff6384;">上月</th>
-                        </tr>
-                    </thead>
-                    <tbody id="compareTableBody"></tbody>
-                </table>
-                <div style="margin-top: 15px;">
-                    <div style="padding: 8px; background: #fce4ec; border-radius: 5px; color: #c2185b; font-size: 0.9em; margin-bottom:5px;">
-                        📅 上月總支出：<span id="lastMonthTotalDisplay" style="font-weight: bold;">...</span>
-                    </div>
-                    <div style="padding: 8px; background: #fff3cd; border-radius: 5px; color: #856404; font-size: 0.9em;">
-                        💡 差異：<span id="totalDiff" style="font-weight: bold;">...</span>
-                    </div>
+    <div id="view-assets" class="view-section">
+        
+        <div class="card full-width" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; text-align: center; padding: 30px;">
+            <h2 style="margin:0; font-size: 1.2rem; opacity: 0.8;">💰 總資產淨值</h2>
+            <div id="totalAssetsDisplay" style="font-size: 3.5rem; font-weight: bold; margin: 10px 0;">計算中...</div>
+            
+            <div style="margin-top: 20px; text-align: left;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">
+                    <span>🎯 第一桶金目標</span><span id="goalPercent">0%</span>
+                </div>
+                <div class="progress-container"><div id="goalProgressBar" class="progress-bar"></div></div>
+                <div id="predictionText" style="font-size: 0.85em; color: #ccc; margin-top: 8px; text-align: right;">分析中...</div>
+            </div>
+
+            <div class="roi-box" style="display: flex; justify-content: center; gap: 30px; margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 15px; flex-wrap: wrap;">
+                <div class="roi-item" style="text-align: center;">
+                    <div style="font-size: 0.9rem; opacity: 0.8;">成本</div><div id="totalCostDisplay" style="font-size: 1.2rem; font-weight: bold;">$0</div>
+                </div>
+                <div class="roi-item" style="text-align: center;">
+                    <div style="font-size: 0.9rem; opacity: 0.8;">損益</div><div id="totalProfitDisplay" style="font-size: 1.2rem; font-weight: bold;">$0</div>
+                </div>
+                <div class="roi-item" style="text-align: center;">
+                    <div style="font-size: 0.9rem; opacity: 0.8;">ROI</div><div id="roiDisplay" style="font-size: 1.2rem; font-weight: bold; color: #4ade80;">0%</div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="card full-width" style="border-left: 5px solid #2196F3;">
-        <h2>💳 各帳戶即時餘額 (對帳專區)</h2>
-        <div id="accountBalanceContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px;">
-            <div style="color: #888;">計算中...</div>
-        </div>
-    </div>
-
-    <div class="card full-width" style="border-left: 5px solid #9c27b0;">
-        <h2>🔄 內部轉帳 / 領錢 / 還債</h2>
-        <div class="asset-form" style="flex-direction: row; flex-wrap: wrap; align-items: flex-end;">
-            <div style="flex:1;">
-                <label>日期</label><input type="date" id="transDate" style="width:90%">
+        <div class="card full-width">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h2>📈 資產趨勢</h2>
+                <button onclick="snapshotAssets()" id="btnSnapshot" style="background: #6c757d; font-size: 0.8rem; padding: 5px 15px;">📸 快照</button>
             </div>
-            <div style="flex:1;">
-                <label>從</label>
-                <select id="transFrom" style="width:90%">
-                    <option value="郵局">郵局</option>
-                    <option value="富邦銀行">富邦銀行</option>
-                    <option value="中國信託">中國信託</option>
-                    <option value="錢包">錢包</option>
-                </select>
-            </div>
-            <div style="flex:0.2; text-align:center; padding-bottom:10px;">➡️</div>
-            <div style="flex:1;">
-                <label>轉入</label>
-                <select id="transTo" style="width:90%">
-                    <option value="錢包">錢包</option>
-                    <option value="中國信託">中國信託</option>
-                    <option value="悠遊卡">悠遊卡</option>
-                    <option value="ipassmoney">iPass Money</option>
-                    <option value="icash">icash</option>
-                    <option value="待付款">⚠️ 待付款 (還債)</option>
-                    <option value="富邦銀行">富邦銀行</option>
-                    <option value="富邦證券">富邦證券</option>
-                </select>
-            </div>
-            <div style="flex:1;">
-                <label>金額</label><input type="number" id="transAmount" style="width:90%" placeholder="1000">
-            </div>
-            <button onclick="submitTransfer()" id="btnTrans" style="background: #9c27b0; height: 38px; margin-bottom: 2px;">確認</button>
-        </div>
-    </div>
-
-    <div class="card full-width" style="border-left: 5px solid #ff9800;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h2 style="margin:0; font-size: 1.1rem; opacity: 0.9;">🛍️ 夢想購物車</h2>
-            <button onclick="toggleWishForm()" style="background: #ff9800; font-size: 0.8rem; padding: 5px 10px;">＋ 許願</button>
+            <div style="height: 300px;"><canvas id="trendChart"></canvas></div>
         </div>
 
-        <div id="wishForm" class="asset-form" style="display:none; background:#fff3e0; padding:15px; border-radius:10px; margin-bottom:20px;">
-            <label>項目：<input type="text" id="wishItem" placeholder="想買什麼？"></label>
-            <label>金額：<input type="number" id="wishAmount" placeholder="價格"></label>
-            <label>備註：<input type="text" id="wishNote" placeholder="網址或備註"></label>
-            <button onclick="submitWish()" style="background: #ff9800; color: white;">加入清單</button>
-        </div>
-
-        <div id="wishlistContainer" style="display: flex; flex-direction: column; gap: 10px;">
-            <div style="color:#888;">載入中...</div>
-        </div>
-    </div>
-
-    <hr style="border: 0; border-top: 2px dashed #ddd; margin: 30px 0;">
-
-    <h1>🚀 自我成長儀表板</h1>
-
-    <div class="card check-in-box">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h2 style="margin:0; font-size: 1.2rem;">📅 習慣打卡</h2>
-            <input type="date" id="habitDate" style="border: 1px solid #b2ebf2; padding: 5px 10px; border-radius: 8px; background: rgba(255,255,255,0.8); font-weight: bold; color: #00796b;">
-        </div>
-        
-        <div class="checkbox-group">
-            <label><input type="checkbox" id="checkEnglish"> 英文</label>
-            <label><input type="checkbox" id="checkExercise"> 運動習慣</label>
-            <label><input type="checkbox" id="checkReading"> 讀書習慣</label>
-            <label><input type="checkbox" id="checkSleeping"> 睡覺習慣</label>
-        </div>
-        <button onclick="submitHabit()" id="submitBtn" style="background: #00897b;">送出紀錄</button>
-        <span id="statusMsg" style="margin-left: 10px; color: #666;"></span>
-    </div>
-
-    <div class="card">
-        <h2>📈 能力成長曲線 (每日複利)</h2>
-        <canvas id="habitChart"></canvas>
-    </div>
-
-    <hr style="border: 0; border-top: 2px dashed #ddd; margin: 30px 0;">
-
-    <div class="card full-width" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; text-align: center; padding: 30px;">
-        <h2 style="margin:0; font-size: 1.2rem; opacity: 0.8;">💰 總資產淨值 (市值)</h2>
-        <div id="totalAssetsDisplay" style="font-size: 3.5rem; font-weight: bold; margin: 10px 0;">計算中...</div>
-        
-        <div style="margin-top: 20px; text-align: left;">
-            <div style="display: flex; justify-content: space-between; font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">
-                <span>🎯 第一桶金目標：$1,000,000</span>
-                <span id="goalPercent">0%</span>
-            </div>
-            <div class="progress-container">
-                <div id="goalProgressBar" class="progress-bar"></div>
-            </div>
-            <div id="predictionText" style="font-size: 0.85em; color: #666; margin-top: 8px; text-align: right;">
-                正在分析資產成長速度...
-            </div>
-        </div>
-
-        <div class="roi-box" style="display: flex; justify-content: center; gap: 30px; margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 15px; flex-wrap: wrap;">
-            <div class="roi-item" style="text-align: center;">
-                <div style="font-size: 0.9rem; opacity: 0.8;">投資總成本</div>
-                <div id="totalCostDisplay" style="font-size: 1.2rem; font-weight: bold;">$0</div>
-            </div>
-            <div class="roi-item" style="text-align: center;">
-                <div style="font-size: 0.9rem; opacity: 0.8;">未實現損益</div>
-                <div id="totalProfitDisplay" style="font-size: 1.2rem; font-weight: bold;">$0</div>
-            </div>
-            <div class="roi-item" style="text-align: center;">
-                <div style="font-size: 0.9rem; opacity: 0.8;">報酬率 (ROI)</div>
-                <div id="roiDisplay" style="font-size: 1.2rem; font-weight: bold; color: #4ade80;">0%</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card full-width">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h2>📈 各資產每月成長趨勢</h2>
-            <button onclick="snapshotAssets()" id="btnSnapshot" style="background: #6c757d; font-size: 0.8rem; padding: 5px 15px;">📸 紀錄本月詳細快照</button>
-        </div>
-        <div style="height: 350px;">
-            <canvas id="trendChart"></canvas>
-        </div>
-        <div style="font-size:0.8em; color:#666; margin-top:10px; text-align:center;">
-            點擊上方圖例可隱藏/顯示特定資產
-        </div>
-    </div>
-
-    <div class="grid-container">
         <div class="card">
-            <h2>📊 資產現況配置</h2>
-            <div style="height: 250px;"><canvas id="assetPieChart"></canvas></div>
+            <h2>📊 配置比例</h2>
+            <div style="height: 300px;"><canvas id="assetPieChart"></canvas></div>
         </div>
+
         <div class="card">
-            <h2>💵 每月收入 (薪資 vs 投資)</h2>
+            <h2>💵 每月收入</h2>
             <div style="height: 250px;"><canvas id="incomeSourceChart"></canvas></div>
         </div>
+
+        <div class="card full-width" style="border-left: 5px solid #fbc02d;">
+            <h2>✍️ 股票/大額交易</h2>
+            <div class="asset-form">
+                <label>日期：<input type="date" id="assetDate"></label>
+                <label>帳戶：
+                    <select id="assetAccount"><option value="富邦證券">富邦證券</option><option value="郵局">郵局</option><option value="富邦銀行">富邦銀行</option></select>
+                </label>
+                <label>類別：
+                    <select id="assetCategory"><option value="股票">股票</option><option value="現金">現金</option><option value="加密貨幣">加密貨幣</option></select>
+                </label>
+                <label>項目：<input type="text" id="assetItem" placeholder="0050"></label>
+                <label>數量：<input type="number" id="assetQty" placeholder="股數"></label>
+                <label>金額：<input type="number" id="assetAmount" placeholder="總價"></label>
+                <label>型態：
+                    <select id="assetType"><option value="流入">買入 (+)</option><option value="流出">賣出 (-)</option></select>
+                </label>
+                <button onclick="submitAsset()" id="btnAsset" style="background: #fbc02d; color: black; width:100%;">新增紀錄</button>
+            </div>
+        </div>
     </div>
 
-    <div class="card full-width" style="border-left: 5px solid #fbc02d;">
-        <h2>✍️ 資產交易紀錄 (股票/大額資金)</h2>
-        <div class="asset-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            <label>日期：<input type="date" id="assetDate"></label>
-            <label>帳戶：
-                <select id="assetAccount">
-                    <option value="郵局">郵局</option>
-                    <option value="富邦銀行">富邦銀行</option>
-                    <option value="富邦證券">富邦證券</option>
-                </select>
-            </label>
-            <label>類別：
-                <select id="assetCategory">
-                    <option value="現金">現金 (Cash)</option>
-                    <option value="股票">股票 (Stock)</option>
-                    <option value="加密貨幣">加密貨幣</option>
-                </select>
-            </label>
-            <label>項目：<input type="text" id="assetItem" placeholder="如: 0050, 薪水"></label>
-            <label>數量：<input type="number" id="assetQty" placeholder="股數/克數"></label>
-            <label>金額：<input type="number" id="assetAmount" placeholder="總價"></label>
-            <label>型態：
-                <select id="assetType">
-                    <option value="流入">流入/買入 (+)</option>
-                    <option value="流出">流出/賣出 (-)</option>
-                </select>
-            </label>
-        </div>
-        <button onclick="submitAsset()" id="btnAsset" style="margin-top: 15px; background: #fbc02d; color: black; width: 100%;">新增資產紀錄</button>
-    </div>
-
-    <hr style="border: 0; border-top: 2px dashed #ddd; margin: 30px 0;">
-
-    <div class="card full-width" style="border-left: 5px solid #607d8b;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h2>📚 知識資產 (閱讀 & 觀影)</h2>
-            <button onclick="toggleMediaForm()" style="background: #607d8b; font-size: 0.8rem; padding: 5px 15px;">＋ 新增紀錄</button>
+    <div id="view-more" class="view-section">
+        
+        <div class="card full-width" style="border-left: 5px solid #ff9800;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h2>🛍️ 夢想購物車</h2>
+                <button onclick="toggleWishForm()" style="background: #ff9800; font-size: 0.8rem; padding: 5px 10px;">＋ 許願</button>
+            </div>
+            <div id="wishForm" class="asset-form" style="display:none; background:#fff3e0; padding:15px; border-radius:10px; margin-bottom:20px;">
+                <input type="text" id="wishItem" placeholder="想買什麼？">
+                <input type="number" id="wishAmount" placeholder="價格">
+                <input type="text" id="wishNote" placeholder="備註">
+                <button onclick="submitWish()" style="background: #ff9800; color: white;">加入清單</button>
+            </div>
+            <div id="wishlistContainer" style="display: flex; flex-direction: column; gap: 10px;">載入中...</div>
         </div>
 
-        <div id="mediaForm" class="asset-form" style="display:none; background:#f0f4f8; padding:15px; border-radius:10px; margin-bottom:20px;">
-            <label>日期：<input type="date" id="mediaDate"></label>
-            <label>類別：
-                <select id="mediaType">
-                    <option value="書籍">書籍 (Book)</option>
-                    <option value="電影">電影 (Movie)</option>
-                    <option value="課程">課程 (Course)</option>
-                    <option value="影集">影集 (Series)</option>
-                </select>
-            </label>
-            <label>標題：<input type="text" id="mediaTitle" placeholder="書名 / 片名"></label>
-            <label>評分 (1-5)：
-                <select id="mediaRating">
-                    <option value="5">⭐⭐⭐⭐⭐ (大推)</option>
-                    <option value="4">⭐⭐⭐⭐ (不錯)</option>
-                    <option value="3">⭐⭐⭐ (普通)</option>
-                    <option value="2">⭐⭐ (不推)</option>
-                    <option value="1">⭐ (雷)</option>
-                </select>
-            </label>
-            <label>一句心得：<input type="text" id="mediaComment" placeholder="學到了什麼？"></label>
-            <button onclick="submitMedia()" style="background: #607d8b; color: white;">儲存到書櫃</button>
+        <div class="card full-width" style="border-left: 5px solid #607d8b;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h2>📚 知識書櫃</h2>
+                <button onclick="toggleMediaForm()" style="background: #607d8b; font-size: 0.8rem; padding: 5px 15px;">＋</button>
+            </div>
+            <div id="mediaForm" class="asset-form" style="display:none; background:#f0f4f8; padding:15px; border-radius:10px; margin-bottom:20px;">
+                <input type="date" id="mediaDate">
+                <select id="mediaType"><option value="書籍">書籍</option><option value="電影">電影</option><option value="課程">課程</option></select>
+                <input type="text" id="mediaTitle" placeholder="標題">
+                <select id="mediaRating"><option value="5">⭐⭐⭐⭐⭐</option><option value="4">⭐⭐⭐⭐</option><option value="3">⭐⭐⭐</option></select>
+                <input type="text" id="mediaComment" placeholder="心得">
+                <button onclick="submitMedia()" style="background: #607d8b; color: white;">儲存</button>
+            </div>
+            <div id="mediaContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">載入中...</div>
         </div>
 
-        <div id="mediaContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px;">
-            <div style="color:#888;">載入中...</div>
+        <div class="card full-width" style="border-left: 5px solid #2196F3;">
+            <h2>💳 帳戶餘額對帳</h2>
+            <div id="accountBalanceContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px;">
+                <div style="color: #888;">計算中...</div>
+            </div>
         </div>
     </div>
 
@@ -503,19 +303,17 @@
     if (!savedUrl || !savedPass) {
         alert("👋 歡迎！這是第一次使用，請進行初始設定。");
         
-        // 問 GAS 網址 (這就是你的鑰匙)
         let inputUrl = prompt("請貼上您的 GAS 部署網址 (script.google.com...):");
         if (inputUrl) {
             inputUrl = inputUrl.trim();
-            localStorage.setItem("MY_DASHBOARD_URL", inputUrl); // 存起來
+            localStorage.setItem("MY_DASHBOARD_URL", inputUrl); 
             savedUrl = inputUrl;
         }
 
-        // 設定一組密碼
         let inputPass = prompt("請設定一組登入密碼 (以後用這組解鎖):");
         if (inputPass) {
             inputPass = inputPass.trim();
-            localStorage.setItem("MY_DASHBOARD_PASS", inputPass); // 存起來
+            localStorage.setItem("MY_DASHBOARD_PASS", inputPass); 
             savedPass = inputPass;
         }
     }
@@ -526,7 +324,7 @@
         throw new Error("Setup Incomplete");
     }
 
-    // 4. 每日登入檢查 (輸入剛剛設定的密碼)
+    // 4. 每日登入檢查
     const inputCheck = prompt("🔒 請輸入密碼解鎖資產生活紀錄版：");
     if (inputCheck !== savedPass) {
         document.body.innerHTML = `
@@ -539,41 +337,44 @@
         throw new Error("Access Denied");
     }
 
-    // 5. 設定全域變數 (讓後面的程式使用)
+    // 🟢 分頁切換功能
+    function switchTab(tabId) {
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.getElementById('view-' + tabId).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+        window.dispatchEvent(new Event('resize'));
+    }
+
+    // 5. 設定全域變數
     const API_URL = savedUrl;
     const SAVING_GOAL = 1000000; // 你的第一桶金目標
-    const MONTHLY_BUDGET = 15000; // 每月總預算 (例如 25000)
-    // ==========================================
+    const MONTHLY_BUDGET = 15000; // 每月總預算
 
     // ==========================================
-    // 🟢 新增：圖表標籤設定 (預設全關，只在圓餅圖開)
+    // 🟢 圖表標籤設定
     // ==========================================
     Chart.register(ChartDataLabels);
     Chart.defaults.set('plugins.datalabels', { display: false }); 
-    // ==========================================
 
     let myChart = null; let assetChart = null; let incomeChart = null; let compareChart = null; let trendChart = null;
     let globalSnapshotData = []; 
     let globalTotalAssets = 0; 
+    let globalLivingFunds = 0;
 
     // --- 萬用日期格式化函式 (YYYY/MM/DD) ---
     function formatDate(dateInput) {
         if (!dateInput) return "";
         try {
             let d = new Date(dateInput);
-            
-            // 如果解析失敗 (Invalid Date)，嘗試手動解析 "YYYY/MM/DD" 字串
             if (isNaN(d.getTime()) && typeof dateInput === 'string') {
                 let parts = dateInput.split(/[-/]/);
-                // 補全年份 (如果只有 MM/DD)
                 let y = parts.length === 3 ? parts[0] : new Date().getFullYear();
                 let m = parts.length === 3 ? parts[1] : parts[0];
                 let day = parts.length === 3 ? parts[2] : parts[1];
                 d = new Date(y, m - 1, day);
             }
-
-            if (isNaN(d.getTime())) return dateInput; // 真的沒救了就回傳原字串
-
+            if (isNaN(d.getTime())) return dateInput;
             let yyyy = d.getFullYear();
             let mm = String(d.getMonth() + 1).padStart(2, '0');
             let dd = String(d.getDate()).padStart(2, '0');
@@ -585,9 +386,16 @@
 
     window.onload = function() {
         const today = new Date();
-        const todayStr = today.toISOString().split('T')[0]; // 格式 YYYY-MM-DD
-        document.getElementById('habitDate').value = todayStr;
+        const todayStr = today.toISOString().split('T')[0]; 
         
+        // 設定所有日期輸入框預設值
+        const dateInputs = ['habitDate','assetDate','expDate','transDate','mediaDate','evtDate'];
+        dateInputs.forEach(id => { 
+            let el = document.getElementById(id); 
+            if(el) el.value = todayStr; 
+        });
+        
+        // 載入所有資料
         loadChart();             
         loadAssetChart();        
         loadExpenses();          
@@ -597,15 +405,12 @@
         loadTrendChart(); 
         loadMediaList();
         loadTimeWidget();
-        loadWishlist();
     };
 
-    // --- 功能 1 ：習慣打卡 (抓取輸入框日期) ---
+    // --- 功能 1：習慣打卡 ---
     function submitHabit() {
         const btn = document.getElementById('submitBtn');
         const msg = document.getElementById('statusMsg');
-        
-        // 🟢 修改 2：抓取使用者選的日期
         const dateVal = document.getElementById('habitDate').value;
         
         if (!dateVal) { alert("請選擇日期"); return; }
@@ -615,7 +420,7 @@
 
         const payload = {
             tab: "Habit_Log",
-            date: dateVal, // 直接傳送輸入框的值
+            date: dateVal,
             english: document.getElementById('checkEnglish').checked,
             exercise: document.getElementById('checkExercise').checked,
             reading: document.getElementById('checkReading').checked,
@@ -627,7 +432,6 @@
             if(data.includes("Success")) {
                 btn.innerText = "✅ 完成";
                 msg.innerText = "紀錄成功！";
-                // 成功後重新整理圖表
                 setTimeout(() => { 
                     loadChart(); 
                     btn.disabled = false; 
@@ -642,106 +446,76 @@
         });
     }
 
-    // --- 功能 2 ：習慣圖 ---
+    // --- 功能 2：習慣圖 ---
     function loadChart() {
-        fetch(API_URL + "?tab=Habit_Log")
-            .then(res => res.json())
-            .then(data => {
-                if(data.length === 0) return;
-                
-                // 1. 取得最近 30 天資料
-                const recentData = data.slice(-30); 
-                const dates = recentData.map(d => d.日期);
+        fetch(API_URL + "?tab=Habit_Log").then(res => res.json()).then(data => {
+            if(data.length === 0) return;
+            const recentData = data.slice(-30); 
+            const dates = recentData.map(d => formatDate(d.日期));
 
-                // 2. 核心計算函式：接收一個「欄位名稱」，回傳該習慣的「分數陣列」
-                function getHabitTrend(columnName) {
-                    let score = 100; // ⚠️ 重點：每次呼叫這個函式，分數都要重置回 100
-                    
-                    return recentData.map(d => {
-                        // 抓取對應欄位的值 (例如 d['英文'] 或 d['運動習慣'])
-                        let val = d[columnName];
-                        
-                        // 嚴格判斷：不管是布林值 true 還是字串 "TRUE" 都算成功
-                        let isSuccess = (val === true || val === "TRUE" || val === "True");
-                        
-                        // 複利計算：成功 x1.01，失敗 x0.99
-                        if (isSuccess) {
-                            score *= 1.01;
-                        } else {
-                            score *= 0.99;
-                        }
-                        
-                        return score.toFixed(2);
-                    });
-                }
-
-                // 3. 繪製圖表
-                const ctx = document.getElementById('habitChart');
-                if(myChart) myChart.destroy();
-
-                myChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: dates,
-                        datasets: [
-                            { 
-                                label: '英文', 
-                                data: getHabitTrend('英文'), // 👈 指定讀取 Excel 的「英文」欄位
-                                borderColor: '#FF6384', 
-                                tension: 0.3 
-                            },
-                            { 
-                                label: '運動習慣', 
-                                data: getHabitTrend('運動習慣'), // 👈 指定讀取「運動習慣」
-                                borderColor: '#36A2EB', 
-                                tension: 0.3 
-                            },
-                            { 
-                                label: '讀書習慣', 
-                                data: getHabitTrend('讀書習慣'), // 👈 指定讀取「讀書習慣」
-                                borderColor: '#4BC0C0', 
-                                tension: 0.3 
-                            },
-                            { 
-                                label: '睡覺習慣', 
-                                data: getHabitTrend('睡覺習慣'), // 👈 指定讀取「睡覺習慣」
-                                borderColor: '#9966FF', 
-                                tension: 0.3 
-                            }
-                        ]
-                    },
-                    options: { 
-                        scales: { y: { suggestedMin: 90 } },
-                        plugins: {
-                            tooltip: {
-                                mode: 'index',
-                                intersect: false
-                            }
-                        }
-                    }
+            function getHabitTrend(columnName) {
+                let score = 100;
+                return recentData.map(d => {
+                    let val = d[columnName];
+                    let isSuccess = (val === true || val === "TRUE" || val === "True");
+                    score *= (isSuccess ? 1.01 : 0.99);
+                    return score.toFixed(2);
                 });
+            }
+
+            const ctx = document.getElementById('habitChart');
+            if(myChart) myChart.destroy();
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        { label: '英文', data: getHabitTrend('英文'), borderColor: '#FF6384', tension: 0.3 },
+                        { label: '運動', data: getHabitTrend('運動習慣'), borderColor: '#36A2EB', tension: 0.3 },
+                        { label: '讀書', data: getHabitTrend('讀書習慣'), borderColor: '#4BC0C0', tension: 0.3 },
+                        { label: '睡覺', data: getHabitTrend('睡覺習慣'), borderColor: '#9966FF', tension: 0.3 }
+                    ]
+                },
+                options: { scales: { y: { suggestedMin: 90 } }, plugins: { tooltip: { mode: 'index', intersect: false } } }
             });
+        });
     }
 
     // --- 功能 3：資產交易 ---
     function submitAsset() {
         const btn = document.getElementById('btnAsset');
         const vals = {
-            tab: "Asset_Log", date: document.getElementById('assetDate').value || new Date().toISOString().split('T')[0],
-            account: document.getElementById('assetAccount').value, category: document.getElementById('assetCategory').value,
-            item: document.getElementById('assetItem').value, qty: document.getElementById('assetQty').value,
-            amount: document.getElementById('assetAmount').value, type: document.getElementById('assetType').value
+            tab: "Asset_Log", 
+            date: document.getElementById('assetDate').value || new Date().toISOString().split('T')[0],
+            account: document.getElementById('assetAccount').value, 
+            category: document.getElementById('assetCategory').value,
+            item: document.getElementById('assetItem').value, 
+            qty: document.getElementById('assetQty').value,
+            amount: document.getElementById('assetAmount').value, 
+            type: document.getElementById('assetType').value
         };
         if(!vals.item || !vals.amount) { alert("請輸入項目和金額"); return; }
+        
         btn.innerText = "寫入中..."; btn.disabled = true;
-        if (vals.type.includes("流出")) vals.amount = -Math.abs(vals.amount); else vals.amount = Math.abs(vals.amount);
+        
+        if (vals.type.includes("流出")) vals.amount = -Math.abs(vals.amount); 
+        else vals.amount = Math.abs(vals.amount);
+        
         fetch(API_URL, { method: 'POST', body: JSON.stringify(vals) }).then(res => res.text()).then(data => {
-            if (data.includes("Success")) { alert("💰 資產紀錄成功！"); btn.innerText = "新增資產紀錄"; btn.disabled = false; document.getElementById('assetItem').value = ""; document.getElementById('assetAmount').value = ""; loadAssetChart(); loadMonthlyIncome(); loadAccountBalances(); } 
-            else { alert("失敗：" + data); btn.disabled = false; }
+            if (data.includes("Success")) { 
+                alert("💰 資產紀錄成功！"); 
+                btn.innerText = "新增資產紀錄"; btn.disabled = false; 
+                document.getElementById('assetItem').value = ""; 
+                document.getElementById('assetAmount').value = ""; 
+                loadAssetChart(); loadMonthlyIncome(); loadAccountBalances(); 
+            } else { 
+                alert("失敗：" + data); btn.disabled = false; 
+            }
         });
     }
 
-    // --- 功能 4 (百分比專用版)：計算 ROI + 圓餅圖顯示 % ---
+    // --- 功能 4：計算 ROI + 圓餅圖 ---
     function loadAssetChart() {
         Promise.all([
             fetch(API_URL + "?tab=Portfolio").then(res => res.json()),
@@ -752,7 +526,6 @@
             let labels = [], values = [], colors = [];
             const palette = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#E7E9ED', '#76D7C4', '#F1948A'];
             
-            // 1. 建立成本對照表
             let costMap = {};
             logData.forEach(row => {
                 let cat = row.資產類別||"", item = row.項目名稱||row.項目||"", type = row.交易型態||row.型態||"", amt = Number(row.金額);
@@ -786,7 +559,6 @@
             globalSnapshotData.push({ item: "總資產", qty: 1, mv: currentMarketValue, cost: totalInvestCost });
             globalTotalAssets = currentMarketValue;
 
-            // 更新進度條
             let percent = Math.min(100, Math.round((currentMarketValue / SAVING_GOAL) * 100));
             const progBar = document.getElementById('goalProgressBar');
             if(progBar) {
@@ -807,24 +579,19 @@
             rEl.innerText = (roi >= 0 ? "+" : "") + roi.toFixed(2) + "%";
             rEl.style.color = roi >= 0 ? "#ff9999" : "#99ff99";
 
-            // --- 畫圓餅圖 ---
             const ctx = document.getElementById('assetPieChart');
             if(assetChart) assetChart.destroy();
             
             assetChart = new Chart(ctx, { 
                 type: 'doughnut', 
-                data: { 
-                    labels: labels, 
-                    datasets: [{ data: values, backgroundColor: colors }] 
-                }, 
+                data: { labels: labels, datasets: [{ data: values, backgroundColor: colors }] }, 
                 options: { 
                     responsive: true, 
                     maintainAspectRatio: false, 
                     plugins: { 
                         legend: { position: 'right' },
-                        // 🟢 這裡針對圓餅圖「開啟」標籤顯示
                         datalabels: {
-                            display: true, // 只有這裡設為 true
+                            display: true,
                             color: '#fff',
                             font: { weight: 'bold', size: 11 },
                             formatter: (value, ctx) => {
@@ -832,8 +599,6 @@
                                 let dataArr = ctx.chart.data.datasets[0].data;
                                 dataArr.map(data => { sum += data; });
                                 let percentage = (value * 100 / sum).toFixed(1) + "%";
-                                
-                                // 佔比太小 (<3%) 隱藏不顯示，避免重疊
                                 if((value * 100 / sum) < 3) return ""; 
                                 return percentage;
                             }
@@ -847,12 +612,25 @@
     // --- 功能 5：送出日常記帳 ---
     function submitExpense() {
         const btn = document.getElementById('btnExp');
-        const vals = { tab: "Expenses_DB", date: document.getElementById('expDate').value || new Date().toISOString().split('T')[0], type: document.getElementById('expType').value, account: document.getElementById('expAccount').value, category: document.getElementById('expCategory').value, item: document.getElementById('expItem').value, amount: document.getElementById('expAmount').value };
+        const vals = { 
+            tab: "Expenses_DB", 
+            date: document.getElementById('expDate').value, 
+            type: document.getElementById('expType').value, 
+            account: document.getElementById('expAccount').value, 
+            category: document.getElementById('expCategory').value, 
+            item: document.getElementById('expItem').value, 
+            amount: document.getElementById('expAmount').value 
+        };
         if(!vals.item || !vals.amount) { alert("請輸入項目和金額"); return; }
         btn.innerText = "寫入中..."; btn.disabled = true;
         fetch(API_URL, { method: 'POST', body: JSON.stringify(vals) }).then(res => res.text()).then(data => {
-            if (data.includes("Success")) { alert("💸 記帳成功！"); btn.disabled = false; btn.innerText = "記一筆"; document.getElementById('expItem').value = ""; document.getElementById('expAmount').value = ""; loadExpenses(); loadExpenseComparison(); loadAccountBalances(); loadTrendChart(); } 
-            else { alert("失敗：" + data); btn.disabled = false; }
+            if (data.includes("Success")) { 
+                alert("💸 記帳成功！"); 
+                btn.disabled = false; btn.innerText = "記一筆"; 
+                document.getElementById('expItem').value = ""; 
+                document.getElementById('expAmount').value = ""; 
+                loadExpenses(); loadExpenseComparison(); loadAccountBalances(); loadTrendChart(); 
+            } else { alert("失敗：" + data); btn.disabled = false; }
         });
     }
 
@@ -862,75 +640,83 @@
             const list = document.getElementById('expenseList'); list.innerHTML = ""; 
             if(data.length === 0) { list.innerHTML = "<li style='color:#ccc'>無紀錄</li>"; return; }
             data.slice(-10).reverse().forEach(row => {
-                const color = row.收支 === "收入" ? "#4caf50" : "#e91e63"; const sign = row.收支 === "收入" ? "+" : "-";
-                list.innerHTML += `<li style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between;"><div><span style="font-weight:bold; color:#555;">${row.項目}</span><span style="font-size:0.85em; color:#999; margin-left:5px;">(${row.日期})</span><br><span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">(${formatDate(row.日期)})${row.類別}</span><span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.帳戶}</span></div><div style="font-weight:bold; color:${color};">${sign}$${row.金額}</div></li>`;
+                const color = row.收支 === "收入" ? "#4caf50" : "#e91e63"; 
+                const sign = row.收支 === "收入" ? "+" : "-";
+                list.innerHTML += `<li style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between;"><div><span style="font-weight:bold; color:#555;">${row.項目}</span><span style="font-size:0.85em; color:#999; margin-left:5px;">(${formatDate(row.日期)})</span><br><span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.類別}</span><span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.帳戶}</span></div><div style="font-weight:bold; color:${color};">${sign}$${row.金額}</div></li>`;
             });
         });
     }
 
-    // --- 功能 7 (預算監控版)：支出比較 + 預算進度條 ---
+    // --- 功能 7：支出比較 ---
     function loadExpenseComparison() {
         fetch(API_URL + "?tab=Expenses_DB").then(res => res.json()).then(data => {
             if(data.length === 0) return;
-            const now = new Date(); const cmKey = `${now.getFullYear()}/${now.getMonth() + 1}`;
-            let lmYear = now.getFullYear(), lmMonth = now.getMonth(); if (lmMonth === 0) { lmYear -= 1; lmMonth = 12; } const lmKey = `${lmYear}/${lmMonth}`;
+            const now = new Date(); 
+            const cmKey = `${now.getFullYear()}/${now.getMonth() + 1}`;
+            let lmYear = now.getFullYear(), lmMonth = now.getMonth(); 
+            if (lmMonth === 0) { lmYear -= 1; lmMonth = 12; } 
+            const lmKey = `${lmYear}/${lmMonth}`;
+            
             const cats = ['食', '衣', '住', '行', '育樂', '其他'];
             let stats = { tm: { '食':0, '衣':0, '住':0, '行':0, '育樂':0, '其他':0, 'total': 0 }, lm: { '食':0, '衣':0, '住':0, '行':0, '育樂':0, '其他':0, 'total': 0 } };
             
             data.forEach(row => {
                 if (row.收支 !== "支出") return; 
-                let d = new Date(row.日期); let rKey = !isNaN(d.getTime()) ? `${d.getFullYear()}/${d.getMonth()+1}` : "";
+                let d = new Date(row.日期); 
+                let rKey = !isNaN(d.getTime()) ? `${d.getFullYear()}/${d.getMonth()+1}` : "";
                 
-                // 日期防呆
-                if(typeof row.日期 === 'string' && row.日期.includes("/")) {
-                     let parts = row.日期.split("/");
-                     let y = parts.length===3 ? parts[0] : now.getFullYear();
-                     let m = parts.length===3 ? parts[1] : parts[0];
-                     rKey = `${y}/${parseInt(m)}`;
+                if(typeof row.日期 === 'string' && row.日期.includes("/")) { 
+                    let parts = row.日期.split("/"); 
+                    let y = parts.length===3 ? parts[0] : now.getFullYear(); 
+                    let m = parts.length===3 ? parts[1] : parts[0]; 
+                    rKey = `${y}/${parseInt(m)}`; 
                 }
 
-                let c = cats.includes(row.類別) ? row.類別 : "其他"; let amt = Number(row.金額);
-                if (rKey === cmKey) { stats.tm[c]+=amt; stats.tm.total+=amt; } else if (rKey === lmKey) { stats.lm[c]+=amt; stats.lm.total+=amt; }
+                let c = cats.includes(row.類別) ? row.類別 : "其他"; 
+                let amt = Number(row.金額);
+                if (rKey === cmKey) { stats.tm[c]+=amt; stats.tm.total+=amt; } 
+                else if (rKey === lmKey) { stats.lm[c]+=amt; stats.lm.total+=amt; }
             });
 
-            // 1. 更新本月總支出數字
             document.getElementById('monthExpenseDisplay').innerText = "$" + stats.tm.total.toLocaleString();
             
-            // ==========================================
-            // 🟢 2. 更新預算進度條 (Budget Logic)
-            // ==========================================
-            const currentExpense = stats.tm.total;
-            const remain = MONTHLY_BUDGET - currentExpense;
-            let percent = Math.round((currentExpense / MONTHLY_BUDGET) * 100);
-            
-            // 防止進度條爆出去
+            // 預算更新
+            const currentExpense = stats.tm.total; 
+            const remain = MONTHLY_BUDGET - currentExpense; 
+            let percent = Math.round((currentExpense / MONTHLY_BUDGET) * 100); 
             let barWidth = percent > 100 ? 100 : percent;
 
-            document.getElementById('budgetLimit').innerText = MONTHLY_BUDGET.toLocaleString();
-            document.getElementById('budgetPercent').innerText = percent + "%";
+            document.getElementById('budgetLimit').innerText = MONTHLY_BUDGET.toLocaleString(); 
+            document.getElementById('budgetPercent').innerText = percent + "%"; 
             document.getElementById('budgetBar').style.width = barWidth + "%";
             
-            const msgEl = document.getElementById('budgetMessage');
-            if (remain >= 0) {
-                msgEl.innerText = `✅ 還剩 $${remain.toLocaleString()} 可花`;
-                // 預算內顯示白色條
-                document.getElementById('budgetBar').style.backgroundColor = "#fff";
-            } else {
-                msgEl.innerText = `⚠️ 已超支 $${Math.abs(remain).toLocaleString()} !`;
-                // 超支顯示黃色警示 (在紅色背景上比較明顯)
-                document.getElementById('budgetBar').style.backgroundColor = "#ffeb3b";
+            const msgEl = document.getElementById('budgetMessage'); 
+            if (remain >= 0) { 
+                msgEl.innerText = `✅ 還剩 $${remain.toLocaleString()} 可花`; 
+                document.getElementById('budgetBar').style.backgroundColor = "#fff"; 
+            } else { 
+                msgEl.innerText = `⚠️ 已超支 $${Math.abs(remain).toLocaleString()} !`; 
+                document.getElementById('budgetBar').style.backgroundColor = "#ffeb3b"; 
             }
-            // ==========================================
 
             document.getElementById('lastMonthTotalDisplay').innerText = "$" + stats.lm.total.toLocaleString();
             let diff = stats.tm.total - stats.lm.total;
             document.getElementById('totalDiff').innerHTML = diff > 0 ? `<span style="color:red">多花 $${diff.toLocaleString()}</span>` : `<span style="color:green">省下 $${Math.abs(diff).toLocaleString()}</span>`;
-            
-            const ctx = document.getElementById('expenseCompareChart'); if(compareChart) compareChart.destroy();
-            compareChart = new Chart(ctx, { type: 'bar', data: { labels: cats, datasets: [{ label: '本月', data: cats.map(c=>stats.tm[c]), backgroundColor: '#36a2eb' }, { label: '上月', data: cats.map(c=>stats.lm[c]), backgroundColor: '#ff6384' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } } });
-            
+
+            const ctx = document.getElementById('expenseCompareChart'); 
+            if(compareChart) compareChart.destroy();
+            compareChart = new Chart(ctx, { 
+                type: 'bar', 
+                data: { labels: cats, datasets: [{ label: '本月', data: cats.map(c=>stats.tm[c]), backgroundColor: '#36a2eb' }, { label: '上月', data: cats.map(c=>stats.lm[c]), backgroundColor: '#ff6384' }] }, 
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } } 
+            });
+
             const body = document.getElementById('compareTableBody'); body.innerHTML = "";
-            cats.forEach(c => { let v1 = stats.tm[c], v2 = stats.lm[c], d = v1-v2, dStr = d > 0 ? `<span style="color:red">▲ ${d}</span>` : (d<0 ? `<span style="color:green">▼ ${Math.abs(d)}</span>` : "-"); body.innerHTML += `<tr><td style="padding:8px;font-weight:bold">${c}</td><td>$${v1}</td><td style="color:#888">$${v2}</td><td>${dStr}</td></tr>`; });
+            cats.forEach(c => { 
+                let v1 = stats.tm[c], v2 = stats.lm[c], d = v1-v2; 
+                let dStr = d > 0 ? `<span style="color:red">▲ ${d}</span>` : (d<0 ? `<span style="color:green">▼ ${Math.abs(d)}</span>` : "-"); 
+                body.innerHTML += `<tr><td style="padding:8px;font-weight:bold">${c}</td><td>$${v1}</td><td style="color:#888">$${v2}</td><td>${dStr}</td></tr>`; 
+            });
         });
     }
 
@@ -1023,25 +809,49 @@
             });
     }
 
-    // --- 功能 9：計算餘額 ---
+
+    // --- 功能 9 (修正版)：計算餘額 + 觸發願望清單 ---
     function loadAccountBalances() {
-        Promise.all([fetch(API_URL+"?tab=Asset_Log").then(r=>r.json()), fetch(API_URL+"?tab=Expenses_DB").then(r=>r.json())]).then(([aData, eData]) => {
+        Promise.all([
+            fetch(API_URL+"?tab=Asset_Log").then(r=>r.json()), 
+            fetch(API_URL+"?tab=Expenses_DB").then(r=>r.json())
+        ]).then(([aData, eData]) => {
+            
             let bal = {};
+            // 1. 算資產流動
             aData.forEach(r => { let a=r.帳戶; if(a) bal[a] = (bal[a]||0) + Number(r.金額); });
+            // 2. 算日常支出
             eData.forEach(r => { let a=r.帳戶, amt=Number(r.金額); if(a) { if(r.收支==="支出") bal[a] = (bal[a]||0) - amt; else bal[a] = (bal[a]||0) + amt; } });
+
+            // 3. 計算生活可用資金
             const livingAcc = ["錢包", "中國信託", "icash", "ipassmoney", "學生證", "悠遊卡", "一卡通"];
-            let liveTotal = 0; livingAcc.forEach(a => liveTotal += (bal[a]||0));
-            document.getElementById('livingFundsDisplay').innerText = "$" + liveTotal.toLocaleString();
-            const box = document.getElementById('accountBalanceContainer'); box.innerHTML = "";
-            const sortList = [...livingAcc, "郵局", "富邦銀行", "富邦證券", "待付款"];
-            Object.keys(bal).sort((a,b) => (sortList.indexOf(a)===-1?99:sortList.indexOf(a)) - (sortList.indexOf(b)===-1?99:sortList.indexOf(b))).forEach(a => { let v = bal[a], c = v>=0?"#333":"#e91e63"; box.innerHTML += `<div style="background:#f8f9fa;padding:15px;border-radius:8px;text-align:center;border:1px solid #eee;"><div style="font-size:0.9em;color:#666;margin-bottom:5px;">${a}</div><div style="font-size:1.2em;font-weight:bold;color:${c}">$${v.toLocaleString()}</div></div>`; });
+            let liveTotal = 0; 
+            livingAcc.forEach(a => liveTotal += (bal[a]||0));
+            
+            // 🟢 關鍵修改：存入全域變數
+            globalLivingFunds = liveTotal;
+
+            // 更新網頁顯示 (如果有重複ID，這裡只會更新第一個，建議用 Class 但這裡先維持 ID)
+            const displayEl = document.getElementById('livingFundsDisplay');
+            if(displayEl) displayEl.innerText = "$" + liveTotal.toLocaleString();
+
+            // 🟢 關鍵修改：餘額算好了，現在可以載入願望清單了！
+            loadWishlist();
+
+            // 4. 更新個別帳戶卡片
+            const box = document.getElementById('accountBalanceContainer'); 
+            if(box) {
+                box.innerHTML = "";
+                const sortList = [...livingAcc, "郵局", "富邦銀行", "富邦證券", "待付款"];
+                Object.keys(bal).sort((a,b) => (sortList.indexOf(a)===-1?99:sortList.indexOf(a)) - (sortList.indexOf(b)===-1?99:sortList.indexOf(b))).forEach(a => { let v = bal[a], c = v>=0?"#333":"#e91e63"; box.innerHTML += `<div style="background:#f8f9fa;padding:15px;border-radius:8px;text-align:center;border:1px solid #eee;"><div style="font-size:0.9em;color:#666;margin-bottom:5px;">${a}</div><div style="font-size:1.2em;font-weight:bold;color:${c}">$${v.toLocaleString()}</div></div>`; });
+            }
         });
     }
 
     // --- 功能 10：轉帳 ---
     function submitTransfer() {
         const btn = document.getElementById('btnTrans');
-        const vals = { date: document.getElementById('transDate').value || new Date().toISOString().split('T')[0], from: document.getElementById('transFrom').value, to: document.getElementById('transTo').value, amt: document.getElementById('transAmount').value };
+        const vals = { date: document.getElementById('transDate').value, from: document.getElementById('transFrom').value, to: document.getElementById('transTo').value, amt: document.getElementById('transAmount').value };
         if(!vals.amt || vals.from === vals.to) { alert("金額錯誤"); return; }
         btn.innerText = "處理中..."; btn.disabled = true;
         const pOut = { tab:"Asset_Log", date:vals.date, account:vals.from, category:"現金", item:"轉出->"+vals.to, qty:"", amount:-Math.abs(vals.amt), type:"流出" };
@@ -1049,487 +859,160 @@
         Promise.all([fetch(API_URL, { method:'POST', body:JSON.stringify(pOut) }), fetch(API_URL, { method:'POST', body:JSON.stringify(pIn) })]).then(() => { alert("轉帳成功！"); btn.innerText="確認"; btn.disabled=false; document.getElementById('transAmount').value=""; loadAssetChart(); loadAccountBalances(); });
     }
 
-    // --- 功能 11：多資產走勢圖 + 財富預測 ---
+    // --- 功能 11：資產趨勢圖 ---
     function loadTrendChart() {
-        Promise.all([
-            fetch(API_URL + "?tab=History_Log").then(r=>r.json())
-        ]).then(([histData]) => {
+        Promise.all([fetch(API_URL+"?tab=History_Log").then(r=>r.json())]).then(([histData]) => {
             if(histData.length === 0) return;
-
-            let groupedData = {};
-            let allDates = new Set();
-            
-            // 專門給預測用的陣列
-            let totalAssetRecords = []; 
-
+            let groupedData = {}, allDates = new Set(), totalAssetRecords = [];
             histData.forEach(r => {
-                let dStr = r.日期; 
-                if(!dStr) return;
-                
-                // 日期統一處理 (YYYY/MM/DD)
-                // 為了排序準確，這裡同時存 "字串(給圖表用)" 和 "時間戳(給計算用)"
-                let dObj = new Date(dStr);
-                let dateKey = "";
-                let ts = 0;
-
-                if(!isNaN(dObj.getTime())) {
-                    dateKey = dStr; // 如果原本就是標準格式
-                    ts = dObj.getTime();
-                } else if (typeof dStr === 'string') {
-                    // 處理像 2025/11/1 這種格式
-                    dateKey = dStr;
-                    let parts = dStr.split(/[-/]/);
-                    if(parts.length >= 3) {
-                        ts = new Date(parts[0], parts[1]-1, parts[2]).getTime();
-                    }
-                }
-
-                if(!dateKey) return; // 日期無效就跳過
-
-                allDates.add(dateKey);
-                let item = r.資產名稱;
-                let val = Number(r.現淨值);
-
-                // 1. 給圖表用的分組資料
-                if(!groupedData[item]) groupedData[item] = {};
-                groupedData[item][dateKey] = val;
-
-                // 2. 給預測用的資料 (只抓總資產)
-                if (item === "總資產" && val > 0) {
-                    totalAssetRecords.push({ ts: ts, val: val, dateStr: dateKey });
-                }
+                let dStr = r.日期; if(!dStr) return;
+                let dObj = new Date(dStr), dateKey = "", ts = 0;
+                if(!isNaN(dObj.getTime())) { dateKey = dStr; ts = dObj.getTime(); } 
+                else if (typeof dStr === 'string') { dateKey = dStr; let parts = dStr.split(/[-/]/); if(parts.length >= 3) ts = new Date(parts[0], parts[1]-1, parts[2]).getTime(); }
+                if(!dateKey) return;
+                allDates.add(dateKey); let item = r.資產名稱, val = Number(r.現淨值);
+                if(!groupedData[item]) groupedData[item] = {}; groupedData[item][dateKey] = val;
+                if (item === "總資產" && val > 0) totalAssetRecords.push({ ts: ts, val: val, dateStr: dateKey });
             });
 
-            // ==========================================
-            // 財富預測邏輯
-            // ==========================================
-            // 先按時間排序
             totalAssetRecords.sort((a, b) => a.ts - b.ts);
-            
-            // 進行預測 (需要至少 2 筆資料)
             const predEl = document.getElementById('predictionText');
-            
             if (predEl && totalAssetRecords.length >= 2) {
-                let first = totalAssetRecords[0]; 
-                let last = totalAssetRecords[totalAssetRecords.length - 1];
-                
-                // 計算差距 (天數)
-                let daysDiff = (last.ts - first.ts) / (1000 * 60 * 60 * 24);
-                let moneyDiff = last.val - first.val;
-                
-                // 避免時間太短導致誤差，建議大於 14 天再算
+                let first = totalAssetRecords[0], last = totalAssetRecords[totalAssetRecords.length - 1];
+                let daysDiff = (last.ts - first.ts) / (1000 * 60 * 60 * 24), moneyDiff = last.val - first.val;
                 if (daysDiff > 14) {
-                    // 平均月成長 = 總成長金額 / (總天數 / 30)
-                    let growthSpeed = moneyDiff / (daysDiff / 30); 
-                    let remaining = SAVING_GOAL - last.val; // SAVING_GOAL 是全域變數 (例如 100萬)
-                    
+                    let growthSpeed = moneyDiff / (daysDiff / 30), remaining = SAVING_GOAL - last.val;
                     if (remaining > 0 && growthSpeed > 0) {
                         let monthsNeeded = remaining / growthSpeed;
-                        let targetDate = new Date();
-                        targetDate.setMonth(targetDate.getMonth() + Math.ceil(monthsNeeded));
+                        let targetDate = new Date(); targetDate.setMonth(targetDate.getMonth() + Math.ceil(monthsNeeded));
                         let targetDateStr = `${targetDate.getFullYear()}年 ${targetDate.getMonth() + 1}月`;
-                        
                         predEl.innerHTML = `🚀 平均月增 <b style="color:#2E86C1">$${Math.round(growthSpeed).toLocaleString()}</b>，預計 <b style="color:#27AE60">${targetDateStr}</b> 達標！`;
-                    } else if (remaining <= 0) {
-                        predEl.innerHTML = `🎉 恭喜！你已經達成目標了！`;
-                    } else {
-                        predEl.innerHTML = `📉 資產暫時縮水 (月減 $${Math.round(Math.abs(growthSpeed)).toLocaleString()})，繼續加油！`;
-                    }
-                } else {
-                    predEl.innerText = "⏳ 數據累積中，下個月再來查看預測。";
-                }
-            } else if (predEl) {
-                predEl.innerText = "💡 累積兩筆以上的總資產快照後，將啟動預測功能。";
+                    } else if (remaining <= 0) predEl.innerHTML = `🎉 恭喜！你已經達成目標了！`;
+                    else predEl.innerHTML = `📉 資產暫時縮水，加油！`;
+                } else predEl.innerText = "⏳ 數據累積中...";
             }
-            // ==========================================
 
             let sortedDates = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
+            let datasets = [], colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF'], colorIdx = 0;
+            if(groupedData["總資產"]) { datasets.push({ label: "總資產", data: sortedDates.map(d => groupedData["總資產"][d] || null), borderColor: "#333", borderWidth: 3, tension: 0.1, pointRadius: 4, yAxisID: 'y' }); delete groupedData["總資產"]; }
+            for(let item in groupedData) { datasets.push({ label: item, data: sortedDates.map(d => groupedData[item][d] || null), borderColor: colors[colorIdx % colors.length], backgroundColor: colors[colorIdx % colors.length], borderWidth: 2, tension: 0.1, pointRadius: 3, yAxisID: 'y' }); colorIdx++; }
             
-            // 3. 準備繪圖 Datasets
-            let datasets = [];
-            const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF'];
-            let colorIdx = 0;
-
-            // 先加 "總資產" (把它放第一，用黑色粗線)
-            if(groupedData["總資產"]) {
-                datasets.push({
-                    label: "總資產",
-                    data: sortedDates.map(d => groupedData["總資產"][d] || null),
-                    borderColor: "#333", // 黑色線
-                    borderWidth: 3,
-                    tension: 0.1,
-                    pointRadius: 4,
-                    yAxisID: 'y'
-                });
-                delete groupedData["總資產"]; // 移出清單，以免下面重複畫
-            }
-
-            // 再加其他資產 (0050, 0056...)
-            for(let item in groupedData) {
-                datasets.push({
-                    label: item,
-                    data: sortedDates.map(d => groupedData[item][d] || null),
-                    borderColor: colors[colorIdx % colors.length],
-                    backgroundColor: colors[colorIdx % colors.length],
-                    borderWidth: 2,
-                    tension: 0.1,
-                    pointRadius: 3,
-                    yAxisID: 'y' 
-                });
-                colorIdx++;
-            }
-
-            const ctx = document.getElementById('trendChart');
-            if(trendChart) trendChart.destroy();
-
-            trendChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: sortedDates,
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    scales: {
-                        y: { 
-                            type: 'linear', 
-                            display: true, 
-                            position: 'left', 
-                            title: { display: true, text: '市值 (TWD)' } 
-                        }
-                    },
-                    plugins: { 
-                        legend: { position: 'bottom' },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) label += ': ';
-                                    if (context.parsed.y !== null) {
-                                        label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 }).format(context.parsed.y);
-                                    }
-                                    return label;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
+            const ctx = document.getElementById('trendChart'); if(trendChart) trendChart.destroy();
+            trendChart = new Chart(ctx, { type: 'line', data: { labels: sortedDates, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { y: { type: 'linear', display: true, position: 'left', title: { display: true, text: '市值 (TWD)' } } }, plugins: { legend: { position: 'bottom' } } } });
         });
     }
 
-    // --- 🟢 功能 12：批次寫入快照  ---
+    // --- 功能 12：批次寫入快照 ---
     function snapshotAssets() {
-        if(!globalSnapshotData || globalSnapshotData.length === 0) { 
-            alert("資產數據載入中，請稍後再試"); 
-            return; 
-        }
-        
-        const btn = document.getElementById('btnSnapshot');
-        btn.innerText = "儲存中..."; btn.disabled = true;
-
+        if(!globalSnapshotData || globalSnapshotData.length === 0) { alert("數據載入中..."); return; }
+        const btn = document.getElementById('btnSnapshot'); btn.innerText = "儲存中..."; btn.disabled = true;
         const today = new Date().toISOString().split('T')[0];
-        
-        // 準備二維陣列資料
         let rowsToSend = globalSnapshotData.map(item => {
             let finalName = item.item;
-            
-            // 🟢 關鍵修正：如果名稱是 "0" 開頭的數字 (例如 0050)，前面加單引號
-            // 這樣 Excel 才會把它當成文字，保留前面的 0
-            if (String(finalName).startsWith("0") && !isNaN(finalName)) {
-                finalName = "'" + finalName;
-            }
-
+            if (String(finalName).startsWith("0") && !isNaN(finalName)) { finalName = "'" + finalName; }
             return [today, finalName, item.qty, item.mv, item.cost];
         });
-
-        const payload = {
-            tab: "History_Log",
-            rows: rowsToSend 
-        };
-        
-        fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
-        .then(res => res.text())
-        .then(data => {
-            if(data.includes("Success")) {
-                alert("📸 成功紀錄！");
-                btn.innerText = "📸 紀錄本月詳細快照";
-                btn.disabled = false;
-                loadTrendChart();
-            } else {
-                alert("失敗：" + data);
-                btn.disabled = false;
-            }
-        });
+        const payload = { tab: "History_Log", rows: rowsToSend };
+        fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) }).then(res => res.text()).then(data => { if(data.includes("Success")) { alert("📸 成功紀錄！"); btn.innerText = "📸 紀錄快照"; btn.disabled = false; loadTrendChart(); } else { alert("失敗：" + data); btn.disabled = false; } });
     }
 
-    // --- 🟢 功能 13：切換輸入框顯示/隱藏 ---
-    function toggleMediaForm() {
-        const form = document.getElementById('mediaForm');
-        form.style.display = form.style.display === "none" ? "flex" : "none";
-    }
-
-    // --- 🟢 功能 14：送出媒體紀錄 ---
+    // --- 功能 13 ~ 15：媒體櫃 ---
+    function toggleMediaForm() { const f = document.getElementById('mediaForm'); f.style.display = f.style.display==="none"?"flex":"none"; }
     function submitMedia() {
-        const btn = event.target; 
-        btn.innerText = "儲存中..."; btn.disabled = true;
-        
-        const payload = {
-            tab: "Media_Log",
-            date: document.getElementById('mediaDate').value || new Date().toISOString().split('T')[0],
-            type: document.getElementById('mediaType').value,
-            title: document.getElementById('mediaTitle').value,
-            rating: document.getElementById('mediaRating').value,
-            comment: document.getElementById('mediaComment').value
-        };
-
-        if(!payload.title) { alert("請輸入標題"); btn.disabled=false; return; }
-
-        fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
-        .then(res => res.text()).then(data => {
-            if(data.includes("Success")) {
-                alert("📚 紀錄成功！");
-                btn.innerText = "儲存到書櫃"; btn.disabled = false;
-                document.getElementById('mediaTitle').value = "";
-                document.getElementById('mediaComment').value = "";
-                toggleMediaForm(); // 收起表單
-                loadMediaList();   // 重新載入列表
-            } else { alert("失敗：" + data); btn.disabled = false; }
-        });
+        const btn = event.target; btn.innerText = "..."; btn.disabled = true;
+        const payload = { tab: "Media_Log", date: document.getElementById('mediaDate').value, type: document.getElementById('mediaType').value, title: document.getElementById('mediaTitle').value, rating: document.getElementById('mediaRating').value, comment: document.getElementById('mediaComment').value };
+        if(!payload.title) { alert("請填標題"); btn.disabled=false; return; }
+        fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) }).then(r=>r.text()).then(d=>{ if(d.includes("Success")) { alert("成功！"); btn.innerText="儲存"; btn.disabled=false; toggleMediaForm(); loadMediaList(); } else { alert("失敗"); btn.disabled=false; } });
     }
-
-    // --- 🟢 功能 15：讀取並顯示卡片牆 ---
     function loadMediaList() {
-        fetch(API_URL + "?tab=Media_Log").then(res => res.json()).then(data => {
-            const container = document.getElementById('mediaContainer');
-            container.innerHTML = "";
-            
-            if(data.length === 0) { container.innerHTML = "<div style='color:#ccc'>還沒有紀錄，快去閱讀吧！</div>"; return; }
-
-            // 反轉順序，讓最新的在最上面
+        fetch(API_URL + "?tab=Media_Log").then(r=>r.json()).then(data => {
+            const c = document.getElementById('mediaContainer'); c.innerHTML = "";
+            if(data.length===0) { c.innerHTML="<div style='color:#ccc'>無紀錄</div>"; return; }
             data.reverse().forEach(row => {
-                let stars = "⭐".repeat(Number(row.評分));
-                let icon = "📄";
-                if(row.類別 === "書籍") icon = "📖";
-                if(row.類別 === "電影") icon = "🎬";
-                if(row.類別 === "課程") icon = "🎓";
-
-                let cardHtml = `
-                    <div style="background:#f8f9fa; padding:15px; border-radius:10px; border-left: 4px solid #607d8b; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                            <span style="font-size:0.85em; color:#666; background:#e0e0e0; padding:2px 6px; border-radius:4px;">${icon} ${row.類別}</span>
-                            <span style="font-size:0.85em; color:#999;">${row.日期}</span>
-                        </div>
-                        <div style="font-weight:bold; font-size:1.1em; margin-bottom:5px; color:#333;">${row.標題}</div>
-                        <div style="color:#f39c12; font-size:0.9em; margin-bottom:8px;">${stars}</div>
-                        <div style="font-size:0.9em; color:#555; font-style:italic;">"${row.心得}"</div>
-                    </div>
-                `;
-                container.innerHTML += cardHtml;
+                let stars = "⭐".repeat(Number(row.評分)), icon = row.類別==="書籍"?"📖":"🎬";
+                c.innerHTML += `<div style="background:#f8f9fa;padding:15px;border-radius:10px;border-left:4px solid #607d8b;box-shadow:0 2px 5px rgba(0,0,0,0.05);"><div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:0.85em;color:#666;">${icon} ${row.類別}</span><span style="font-size:0.85em;color:#999;">${row.日期}</span></div><div style="font-weight:bold;margin-bottom:5px;">${row.標題}</div><div style="color:#f39c12;margin-bottom:8px;">${stars}</div><div style="font-size:0.9em;color:#555;">"${row.心得}"</div></div>`;
             });
         });
     }
 
-    // --- 🟢 功能 16：時間倒數小工具 ---
+    // --- 功能 16：時間倒數 ---
+    const MY_EVENTS = [{ title: "🎓 距離畢業", date: "2026-06-30", type: "fixed" }, { title: "🎂 下次生日", date: "10-25", type: "yearly" }];
     function loadTimeWidget() {
-        // 1. 先畫年度進度條
-        const container = document.getElementById('timeContainer');
-        if(!container) return;
+        const c = document.getElementById('timeContainer'); if(!c) return;
+        const now = new Date(), currentYear = now.getFullYear();
+        const start = new Date(currentYear, 0, 1), end = new Date(currentYear+1, 0, 1);
+        const percent = ((now - start) / (end - start)) * 100;
+        let html = `<div><div style="display:flex;justify-content:space-between;font-size:0.9em;margin-bottom:5px;"><span>${currentYear}年 已過</span><span>${percent.toFixed(1)}%</span></div><div style="width:100%;background:rgba(255,255,255,0.2);border-radius:10px;height:8px;"><div style="height:100%;background:#fff;width:${percent}%;border-radius:10px;"></div></div></div>`;
         
-        const now = new Date();
-        const currentYear = now.getFullYear();
-        const startOfYear = new Date(currentYear, 0, 1);
-        const endOfYear = new Date(currentYear + 1, 0, 1);
-        const yearPercent = ((now - startOfYear) / (endOfYear - startOfYear)) * 100;
-        
-        let html = `
-            <div>
-                <div style="display:flex; justify-content:space-between; font-size:0.9em; margin-bottom:5px;">
-                    <span>${currentYear}年 已過</span>
-                    <span>${yearPercent.toFixed(1)}%</span>
-                </div>
-                <div style="width:100%; background:rgba(255,255,255,0.2); border-radius:10px; height:8px;">
-                    <div style="height:100%; background:#fff; width:${yearPercent}%; border-radius:10px; transition:width 1s;"></div>
-                </div>
-            </div>
-        `;
-
-        // 2. 從後端抓取 Events_DB
-        fetch(API_URL + "?tab=Events_DB")
-            .then(res => res.json())
-            .then(data => {
-                if(data.length === 0) {
-                    container.innerHTML = html + "<div style='text-align:center; font-size:0.8em; opacity:0.7; margin-top:10px;'>尚無倒數事件</div>";
-                    return;
-                }
-
-                data.forEach(event => {
-                    let targetDate;
-                    let evtTitle = event['事件名稱'] || event['title']; 
-                    let evtDate = event['日期'] || event['date'];
-                    let evtType = event['類型'] || event['type'];
-
-                    // 日期字串處理
-                    let dateStr = String(evtDate).replace(/\//g, "-").split("T")[0];
-
-                    if (evtType === "fixed") {
-                        // 固定日期
-                        targetDate = new Date(dateStr);
-                    } else {
-                        // 每年重複 (處理 10-25 或 2025-10-25)
-                        let shortDate = dateStr.includes("-") ? dateStr.slice(-5) : dateStr; 
-                        const [m, d] = shortDate.split('-');
-                        targetDate = new Date(currentYear, m - 1, d);
-                        if (now > targetDate) targetDate.setFullYear(currentYear + 1);
-                    }
-
-                    // 計算剩餘天數
-                    const diffTime = targetDate - now;
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-                    if (diffDays < 0 && evtType === "fixed") return; 
-
-                    // 🟢 關鍵修正：使用 formatDate() 統一顯示格式 (YYYY/MM/DD)
-                    let displayDate = formatDate(targetDate);
-
-                    html += `
-                        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.1); padding:10px 15px; border-radius:10px;">
-                            <div>
-                                <div style="font-size:0.85em; opacity:0.8;">${evtTitle}</div>
-                                <div style="font-size:1.1em; font-weight:bold;">${displayDate}</div>
-                            </div>
-                            <div style="text-align:right;">
-                                <div style="font-size:0.85em; opacity:0.8;">還剩下</div>
-                                <div style="font-size:1.5em; font-weight:bold; color:#ffeb3b;">
-                                    ${diffDays > 0 ? diffDays : 0} <span style="font-size:0.6em;">天</span>
-                                </div>
-                            </div>
-                        </div>
-                    `;
+        fetch(API_URL + "?tab=Events_DB").then(r=>r.json()).then(data => {
+            if(data.length > 0) {
+                data.forEach(e => {
+                    let dStr = String(e.日期).replace(/\//g, "-").split("T")[0], tDate;
+                    if(e.類型==="fixed") tDate = new Date(dStr);
+                    else { let [m,d] = (dStr.includes("-")?dStr.slice(-5):dStr).split('-'); tDate = new Date(currentYear, m-1, d); if(now>tDate) tDate.setFullYear(currentYear+1); }
+                    let diff = Math.ceil((tDate-now)/(1000*60*60*24));
+                    if(diff>=0 || e.類型!=="fixed") html += `<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.1);padding:10px 15px;border-radius:10px;margin-top:10px;"><div><div style="font-size:0.85em;opacity:0.8;">${e.事件名稱||e.title}</div><div style="font-size:1.1em;font-weight:bold;">${formatDate(tDate)}</div></div><div style="text-align:right;"><div style="font-size:0.85em;opacity:0.8;">還剩</div><div style="font-size:1.5em;font-weight:bold;color:#ffeb3b;">${diff} <span style="font-size:0.6em;">天</span></div></div></div>`;
                 });
-                
-                container.innerHTML = html;
-            })
-            .catch(err => {
-                console.error(err);
-                container.innerHTML = html + "<div style='text-align:center; font-size:0.8em; opacity:0.7;'>讀取錯誤</div>";
-            });
+            }
+            c.innerHTML = html;
+        }).catch(()=> c.innerHTML = html);
+    }
+    function toggleEventForm() { const f = document.getElementById('eventForm'); f.style.display = f.style.display==="none"?"flex":"none"; }
+    function submitEvent() { 
+        const btn = event.target; btn.disabled=true; 
+        const payload = { tab:"Events_DB", title:document.getElementById('evtTitle').value, date:document.getElementById('evtDate').value, type:document.getElementById('evtType').value };
+        fetch(API_URL, {method:'POST', body:JSON.stringify(payload)}).then(r=>r.text()).then(d=>{ if(d.includes("Success")){alert("成功"); toggleEventForm(); loadTimeWidget();} btn.disabled=false; }); 
     }
 
-    // --- 🟢 功能 17：新增倒數事件 ---
-    function toggleEventForm() {
-        const form = document.getElementById('eventForm');
-        form.style.display = form.style.display === "none" ? "flex" : "none";
-    }
-
-    function submitEvent() {
-        const btn = event.target; btn.innerText = "處理中..."; btn.disabled = true;
-        const title = document.getElementById('evtTitle').value;
-        const date = document.getElementById('evtDate').value;
-        const type = document.getElementById('evtType').value;
-
-        if(!title || !date) { alert("請填寫完整"); btn.disabled=false; return; }
-
-        const payload = {
-            tab: "Events_DB",
-            title: title,
-            date: date,
-            type: type
-        };
-
-        fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
-        .then(res => res.text()).then(data => {
-            if(data.includes("Success")) {
-                alert("⏳ 新增成功！");
-                btn.innerText = "確認新增"; btn.disabled = false;
-                document.getElementById('evtTitle').value = "";
-                document.getElementById('evtDate').value = "";
-                toggleEventForm(); // 收起
-                loadTimeWidget();  // 重整
-            } else { alert("失敗：" + data); btn.disabled = false; }
-        });
-    }
-
-    // --- 功能 18：夢想購物車 (購買後自動隱藏) ---
+    // --- 功能 18 (修正版)：夢想購物車 (讀取全域變數) ---
     function loadWishlist() {
-        const livingEl = document.getElementById('livingFundsDisplay');
-        let livingText = livingEl ? livingEl.innerText : "0";
-        
-        if (livingText.includes("計算中")) { setTimeout(loadWishlist, 500); return; }
-
-        let currentCash = Number(livingText.replace(/[$,]/g, "")) || 0;
+        // 🟢 關鍵修改：直接使用全域變數，不再讀取 DOM
+        let currentCash = globalLivingFunds;
 
         fetch(API_URL + "?tab=Wishlist_DB").then(res => res.json()).then(data => {
             const container = document.getElementById('wishlistContainer');
+            if(!container) return;
             container.innerHTML = "";
             
-            if(data.length === 0) { container.innerHTML = "<div style='color:#ccc; text-align:center;'>目前沒有願望，快去許願吧！</div>"; return; }
-
+            if(data.length === 0) { container.innerHTML = "<div style='color:#ccc;text-align:center;'>無願望</div>"; return; }
+            
             data.forEach((row, index) => {
-                let itemName = row['項目名稱'] || row['項目'] || row['item'] || "未命名";
-                let price = Number(row['預估金額'] || row['金額'] || row['amount'] || 0);
+                let itemName = row['項目名稱']||row['項目']||"", price = Number(row['預估金額']||row['金額']||0);
                 let diff = currentCash - price;
-                let statusHtml = "", cardBg = "#fff";
-
-                if (diff >= 0) {
-                    statusHtml = `<span style="color:#2e7d32; font-weight:bold; font-size:0.9em;">✅ 可購買 (剩餘 $${diff.toLocaleString()})</span>`;
-                    cardBg = "#e8f5e9"; 
-                } else {
-                    statusHtml = `<span style="color:#c62828; font-weight:bold; font-size:0.9em;">❌ 還差 $${Math.abs(diff).toLocaleString()}</span>`;
-                }
-
-                // 🟢 修改點：傳入 'this' 以便抓取按鈕元素，並給卡片一個 ID
-                let buyBtn = diff >= 0 ? 
-                    `<button onclick="fillExpense('${itemName}', '${price}', this)" style="padding:5px 10px; font-size:0.8em; background:#4caf50; margin-left:10px; color:white; border:none; border-radius:5px; cursor:pointer;">購買</button>` : 
+                
+                let bg = diff >= 0 ? '#e8f5e9' : '#fff'; // 買得起顯示淡綠底
+                let status = diff >= 0 ? 
+                    `<span style="color:#2e7d32;font-weight:bold;">✅ 可購買 (剩 $${diff.toLocaleString()})</span>` : 
+                    `<span style="color:#c62828;">❌ 差 $${Math.abs(diff).toLocaleString()}</span>`;
+                
+                let btn = diff >= 0 ? 
+                    `<button onclick="fillExpense('${itemName}', '${price}', this)" style="padding:5px 10px;font-size:0.8em;background:#4caf50;">購買</button>` : 
                     ``;
-
-                let html = `
-                    <div id="wish-card-${index}" style="background:${cardBg}; padding:12px; border-radius:8px; border:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                
+                container.innerHTML += `
+                    <div id="wish-${index}" style="background:${bg};padding:12px;border-radius:8px;border:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
                         <div>
-                            <div style="font-weight:bold; color:#333; font-size:1.1em;">${itemName}</div>
-                            <div style="font-size:0.9em; color:#666;">$${price.toLocaleString()}</div>
-                            <div style="margin-top:2px;">${statusHtml}</div>
+                            <div style="font-weight:bold;color:#333;">${itemName}</div>
+                            <div style="font-size:0.9em;color:#666;">$${price.toLocaleString()}</div>
+                            <div style="margin-top:2px;font-size:0.9em;">${status}</div>
                         </div>
-                        <div style="text-align:right;">
-                            ${buyBtn}
-                        </div>
-                    </div>
-                `;
-                container.innerHTML += html;
+                        <div>${btn}</div>
+                    </div>`;
             });
         });
     }
-
-    // --- 🟢 輔助功能：一鍵帶入記帳並移除卡片 ---
-    function fillExpense(item, price, btnElement) {
-        // 1. 自動填入記帳區
-        document.getElementById('expItem').value = item;
-        document.getElementById('expAmount').value = price;
-        document.getElementById('expType').value = "支出";
-        
-        // 2. 滾動到記帳區
-        document.getElementById('expItem').scrollIntoView({behavior: "smooth"});
-        
-        // 3. 🟢 視覺刪除：把那張願望卡片從網頁上移除
-        // 找到按鈕往上數的父層 div (卡片)，然後刪掉它
-        if (btnElement) {
-            let card = btnElement.closest('div[id^="wish-card-"]');
-            if (card) {
-                card.style.transition = "opacity 0.5s";
-                card.style.opacity = "0"; // 淡出動畫
-                setTimeout(() => card.remove(), 500); // 0.5秒後完全移除
-            }
-        }
-        
-        // 4. 提醒使用者
-        alert(`已將「${item}」帶入記帳區！\n\n⚠️ 注意：\n網頁上已經暫時隱藏此願望，\n但在 Excel 裡它還在，請記得去 Excel 手動刪除該行喔！`);
+    function toggleWishForm() { const f = document.getElementById('wishForm'); f.style.display = f.style.display==="none"?"flex":"none"; }
+    function submitWish() {
+        const btn = event.target; btn.disabled=true;
+        const vals = { tab:"Wishlist_DB", date:new Date().toISOString().split('T')[0], item:document.getElementById('wishItem').value, amount:document.getElementById('wishAmount').value, note:document.getElementById('wishNote').value };
+        fetch(API_URL, {method:'POST', body:JSON.stringify(vals)}).then(r=>r.text()).then(d=>{ if(d.includes("Success")){alert("成功"); toggleWishForm(); loadWishlist();} btn.disabled=false; });
+    }
+    function fillExpense(item, price, el) {
+        document.getElementById('expItem').value = item; document.getElementById('expAmount').value = price; document.getElementById('expType').value = "支出";
+        switchTab('expenses'); document.getElementById('expItem').scrollIntoView({behavior:"smooth"});
+        if(el) { let card = el.closest('div[id^="wish-"]'); if(card) { card.style.opacity="0"; setTimeout(()=>card.remove(), 500); } }
+        alert("已帶入記帳區！請記得去 Excel 刪除願望。");
     }
 </script>
-
 </body>
 </html>
