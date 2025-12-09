@@ -473,17 +473,58 @@
 </div>
 
 <script>
-    // 🟢 5. 簡易密碼鎖 (預設 1234)
-    const API_URL = CONFIG.API_URL;
-    const USER_PASS_CORRECT = CONFIG.PASSWORD;
-    const USER_PASS = prompt("請輸入密碼 (預設: 1234):");
-    if(USER_PASS !== CONFIG.PASSWORD) {
-        document.body.innerHTML = "<div style='display:flex;justify-content:center;align-items:center;height:100vh;'><h1>⛔️ 存取被拒絕</h1></div>";
+    // ==========================================
+    // 🟢 智慧登入系統 
+    // ==========================================
+    
+    // 1. 嘗試從瀏覽器記憶體 (LocalStorage) 抓取設定
+    let savedUrl = localStorage.getItem("MY_DASHBOARD_URL");
+    let savedPass = localStorage.getItem("MY_DASHBOARD_PASS");
+
+    // 2. 如果是第一次使用 (沒存過)，跳出詢問視窗
+    if (!savedUrl || !savedPass) {
+        alert("👋 歡迎！這是第一次使用，請進行初始設定。");
+        
+        // 問 GAS 網址 (這就是你的鑰匙)
+        let inputUrl = prompt("請貼上您的 GAS 部署網址 (script.google.com...):");
+        if (inputUrl) {
+            inputUrl = inputUrl.trim();
+            localStorage.setItem("MY_DASHBOARD_URL", inputUrl); // 存起來
+            savedUrl = inputUrl;
+        }
+
+        // 設定一組密碼
+        let inputPass = prompt("請設定一組登入密碼 (以後用這組解鎖):");
+        if (inputPass) {
+            inputPass = inputPass.trim();
+            localStorage.setItem("MY_DASHBOARD_PASS", inputPass); // 存起來
+            savedPass = inputPass;
+        }
+    }
+
+    // 3. 檢查是否設定完成
+    if (!savedUrl || !savedPass) {
+        alert("⚠️ 設定未完成，無法載入。請重新整理網頁再試一次。");
+        throw new Error("Setup Incomplete");
+    }
+
+    // 4. 每日登入檢查 (輸入剛剛設定的密碼)
+    const inputCheck = prompt("🔒 請輸入密碼解鎖儀表板：");
+    if (inputCheck !== savedPass) {
+        document.body.innerHTML = `
+            <div style='display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;text-align:center;'>
+                <h1>⛔️ 密碼錯誤</h1>
+                <p>存取被拒絕。</p>
+                <button onclick='localStorage.clear();location.reload();' style='padding:10px 20px;font-size:1rem;cursor:pointer;'>重設所有設定 (忘記密碼點我)</button>
+            </div>
+        `;
         throw new Error("Access Denied");
     }
 
-    // 🟢 2. 設定存錢目標 (一百萬)
-    const SAVING_GOAL = 1000000;
+    // 5. 設定全域變數 (讓後面的程式使用)
+    const API_URL = savedUrl;
+    const SAVING_GOAL = 1000000; // 你的第一桶金目標
+    // ==========================================
 
     let myChart = null; let assetChart = null; let incomeChart = null; let compareChart = null; let trendChart = null;
     let globalSnapshotData = []; 
