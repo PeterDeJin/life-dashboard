@@ -168,11 +168,35 @@
         </div>
 
         <div class="card full-width">
-            <h2>📊 本月 vs 上月</h2>
-            <div style="height: 250px;"><canvas id="expenseCompareChart"></canvas></div>
-            <div style="margin-top:15px; font-size:0.9em;">
-                <div style="padding:8px; background:#fce4ec; border-radius:5px; color:#c2185b; margin-bottom:5px;">📅 上月總支出：<b id="lastMonthTotalDisplay">...</b></div>
-                <div style="padding:8px; background:#fff3cd; border-radius:5px; color:#856404;">💡 差異：<b id="totalDiff">...</b></div>
+            <h2>📊 本月 vs 上月 支出比較</h2>
+            
+            <div class="grid-container">
+                <div style="height: 250px;">
+                    <canvas id="expenseCompareChart"></canvas>
+                </div>
+                
+                <div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #ddd; text-align: left;">
+                                <th style="padding: 8px;">類別</th>
+                                <th style="padding: 8px; color: #36a2eb;">本月</th>
+                                <th style="padding: 8px; color: #ff6384;">上月</th>
+                            </tr>
+                        </thead>
+                        <tbody id="compareTableBody">
+                            </tbody>
+                    </table>
+
+                    <div style="margin-top: 15px;">
+                        <div style="padding: 8px; background: #fce4ec; border-radius: 5px; color: #c2185b; margin-bottom:5px; font-size: 0.9em;">
+                            📅 上月總支出：<b id="lastMonthTotalDisplay">...</b>
+                        </div>
+                        <div style="padding: 8px; background: #fff3cd; border-radius: 5px; color: #856404; font-size: 0.9em;">
+                            💡 差異：<b id="totalDiff">...</b>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
