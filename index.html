@@ -1110,7 +1110,7 @@
         alert("已帶入記帳區！請記得去 Excel 刪除願望。");
     }
 
-    // --- 🟢 功能 20：刪除記帳紀錄 ---
+    // --- 🟢 功能 20 (除錯版)：刪除記帳紀錄 ---
     function deleteExpense(date, item, amount, btn) {
         if(!confirm(`確定要刪除「${item} $${amount}」這筆紀錄嗎？`)) return;
 
@@ -1118,9 +1118,9 @@
         btn.disabled = true;
 
         const payload = {
-            action: "delete", // 告訴後端這是刪除指令
+            action: "delete",
             tab: "Expenses_DB",
-            date: date, // 必須傳送原始日期字串 YYYY/MM/DD
+            date: date,
             item: item,
             amount: amount
         };
@@ -1129,18 +1129,17 @@
         .then(res => res.text())
         .then(data => {
             if(data.includes("Deleted")) {
-                // 視覺上直接移除該行
                 let li = btn.closest('li');
                 li.style.opacity = "0";
                 setTimeout(() => {
                     li.remove();
-                    // 重新載入餘額和圖表，確保數據同步
                     loadExpenseComparison(); 
                     loadAccountBalances();
                     alert("🗑️ 已刪除！");
                 }, 500);
             } else if (data.includes("NotFound")) {
-                alert("❌ 找不到這筆資料，可能已經被刪除了，或日期格式不符。");
+                // 🟢 這裡會把後端回傳的比較資料印出來給你看
+                alert("❌ 刪除失敗！系統找不到這筆資料。\n\n🔍 後台比對結果：\n" + data.replace("NotFound: ", ""));
                 btn.innerText = "🗑️";
                 btn.disabled = false;
             } else {
