@@ -143,7 +143,14 @@
                 <label>收支：<select id="expType"><option value="支出">支出</option><option value="收入">收入</option></select></label>
                 <label>帳戶：
                     <select id="expAccount">
-                        <option value="錢包">現金錢包</option><option value="中國信託">中國信託</option><option value="悠遊卡">悠遊卡</option><option value="icash">icash</option><option value="ipassmoney">iPass Money</option><option value="學生證">學生證</option><option value="一卡通">一卡通</option><option value="待付款">⚠️ 待付款</option>
+                        <option value="錢包">現金錢包</option>
+                        <option value="中國信託">中國信託</option>
+                        <option value="悠遊卡">悠遊卡</option>
+                        <option value="icash">icash</option>
+                        <option value="ipassmoney">iPass Money</option>
+                        <option value="學生證">學生證</option>
+                        <option value="一卡通">一卡通</option>
+                        <option value="待付款">⚠️ 待付款</option>
                     </select>
                 </label>
                 <label>類別：<select id="expCategory"><option value="食">食</option><option value="衣">衣</option><option value="住">住</option><option value="行">行</option><option value="育樂">育樂</option><option value="其他">其他</option></select></label>
@@ -158,9 +165,26 @@
             <div class="asset-form">
                 <label>日期：<input type="date" id="transDate"></label>
                 <div style="display:flex; gap:10px;">
-                    <select id="transFrom" style="width:100%"><option value="郵局">郵局</option><option value="富邦銀行">富邦</option><option value="中國信託">中信</option><option value="錢包">錢包</option></select>
+                    <select id="transFrom" style="width:100%">
+                        <option value="郵局">郵局</option>
+                        <option value="富邦銀行">富邦</option>
+                        <option value="中國信託">中信</option>
+                        <option value="錢包">錢包</option>
+                    </select>
                     <span>➡</span>
-                    <select id="transTo" style="width:100%"><option value="錢包">錢包</option><option value="悠遊卡">悠遊卡</option><option value="待付款">還債</option><option value="富邦證券">證券</option></select>
+                    <select id="transTo" style="width:100%">
+                        <option value="錢包">錢包</option>
+                        <option value="悠遊卡">悠遊卡</option>
+                        <option value="icash">icash</option>
+                        <option value="ipassmoney">iPass Money</option>
+                        <option value="學生證">學生證</option>
+                        <option value="一卡通">一卡通</option>
+                        <option value="待付款">還債</option>
+                        <option value="富邦證券">證券</option>
+                        <option value="中國信託">中國信託</option>
+                        <option value="郵局">郵局</option>
+                        <option value="富邦銀行">富邦</option>
+                    </select>
                 </div>
                 <label>金額：<input type="number" id="transAmount" placeholder="1000"></label>
                 <button onclick="submitTransfer()" id="btnTrans" style="background: #9c27b0; width:100%;">確認</button>
@@ -685,71 +709,37 @@
         });
     }
 
-    // --- 功能 6 (升級版)：讀取記帳列表 + 篩選功能 ---
-    
-    // 下載資料並存入全域變數
+    // --- 功能 6 (升級版)：讀取記帳列表 (含刪除按鈕) ---
     function loadExpenses() {
         fetch(API_URL + "?tab=Expenses_DB").then(res => res.json()).then(data => {
-            // 1. 存起來，這樣切換篩選時不用重新下載
-            globalExpensesData = data;
+            const list = document.getElementById('expenseList'); list.innerHTML = ""; 
+            if(data.length === 0) { list.innerHTML = "<li style='color:#ccc'>無紀錄</li>"; return; }
             
-            // 2. 初始顯示 (預設顯示全部)
-            renderExpenseList();
-        });
-    }
-
-    // 根據下拉選單的條件，過濾並畫出列表
-    function renderExpenseList() {
-        const list = document.getElementById('expenseList'); 
-        const filterVal = document.getElementById('recordFilter').value; // 抓取選擇的值 (例如 "CAT_食" 或 "ACC_錢包")
-        
-        list.innerHTML = ""; 
-        
-        if(globalExpensesData.length === 0) { 
-            list.innerHTML = "<li style='color:#ccc'>無紀錄</li>"; 
-            return; 
-        }
-
-        // --- 核心篩選邏輯 ---
-        let filteredData = globalExpensesData.filter(row => {
-            if (filterVal === "ALL") return true; // 全部都過
-            
-            // 如果選的是「類別」(開頭是 CAT_)
-            if (filterVal.startsWith("CAT_")) {
-                let target = filterVal.replace("CAT_", "");
-                return row.類別 === target;
-            }
-            
-            // 如果選的是「帳戶」(開頭是 ACC_)
-            if (filterVal.startsWith("ACC_")) {
-                let target = filterVal.replace("ACC_", "");
-                return row.帳戶 === target;
-            }
-            return true;
-        });
-
-        // 取最後 10 筆並反轉 (讓最新的在上面)
-        const displayData = filteredData.slice(-10).reverse();
-
-        if (displayData.length === 0) {
-            list.innerHTML = "<li style='color:#ccc; text-align:center; padding:10px;'>此條件下無紀錄</li>";
-            return;
-        }
-
-        displayData.forEach(row => {
-            const color = row.收支 === "收入" ? "#4caf50" : "#e91e63"; 
-            const sign = row.收支 === "收入" ? "+" : "-";
-            list.innerHTML += `
-                <li style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">
-                    <div>
-                        <span style="font-weight:bold; color:#555;">${row.項目}</span>
-                        <span style="font-size:0.85em; color:#999; margin-left:5px;">(${formatDate(row.日期)})</span>
-                        <br>
-                        <span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.類別}</span>
-                        <span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.帳戶}</span>
-                    </div>
-                    <div style="font-weight:bold; color:${color};">${sign}$${Number(row.金額).toLocaleString()}</div>
-                </li>`;
+            // 取最後 10 筆並反轉
+            data.slice(-10).reverse().forEach(row => {
+                const color = row.收支 === "收入" ? "#4caf50" : "#e91e63"; 
+                const sign = row.收支 === "收入" ? "+" : "-";
+                
+                // 產生一個不重複的 ID 方便操作
+                // 這裡傳入 row 的原始資料給 deleteExpense 函式
+                let dateStr = formatDate(row.日期); 
+                
+                list.innerHTML += `
+                    <li style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="flex:1;">
+                            <span style="font-weight:bold; color:#555;">${row.項目}</span>
+                            <span style="font-size:0.85em; color:#999; margin-left:5px;">(${dateStr})</span>
+                            <br>
+                            <span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.類別}</span>
+                            <span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.帳戶}</span>
+                        </div>
+                        <div style="font-weight:bold; color:${color}; margin-right:15px;">${sign}$${Number(row.金額).toLocaleString()}</div>
+                        
+                        <button onclick="deleteExpense('${dateStr}', '${row.項目}', '${row.金額}', this)" style="background:#ffebee; color:#c62828; padding:5px 10px; font-size:0.8rem; border-radius:5px; box-shadow:none; border:1px solid #ffcdd2;">
+                            🗑️
+                        </button>
+                    </li>`;
+            });
         });
     }
 
@@ -1118,6 +1108,47 @@
         switchTab('expenses'); document.getElementById('expItem').scrollIntoView({behavior:"smooth"});
         if(el) { let card = el.closest('div[id^="wish-"]'); if(card) { card.style.opacity="0"; setTimeout(()=>card.remove(), 500); } }
         alert("已帶入記帳區！請記得去 Excel 刪除願望。");
+    }
+
+    // --- 🟢 功能 20：刪除記帳紀錄 ---
+    function deleteExpense(date, item, amount, btn) {
+        if(!confirm(`確定要刪除「${item} $${amount}」這筆紀錄嗎？`)) return;
+
+        btn.innerText = "⏳";
+        btn.disabled = true;
+
+        const payload = {
+            action: "delete", // 告訴後端這是刪除指令
+            tab: "Expenses_DB",
+            date: date, // 必須傳送原始日期字串 YYYY/MM/DD
+            item: item,
+            amount: amount
+        };
+
+        fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
+        .then(res => res.text())
+        .then(data => {
+            if(data.includes("Deleted")) {
+                // 視覺上直接移除該行
+                let li = btn.closest('li');
+                li.style.opacity = "0";
+                setTimeout(() => {
+                    li.remove();
+                    // 重新載入餘額和圖表，確保數據同步
+                    loadExpenseComparison(); 
+                    loadAccountBalances();
+                    alert("🗑️ 已刪除！");
+                }, 500);
+            } else if (data.includes("NotFound")) {
+                alert("❌ 找不到這筆資料，可能已經被刪除了，或日期格式不符。");
+                btn.innerText = "🗑️";
+                btn.disabled = false;
+            } else {
+                alert("失敗：" + data);
+                btn.innerText = "🗑️";
+                btn.disabled = false;
+            }
+        });
     }
 </script>
 </body>
