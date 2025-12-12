@@ -149,7 +149,6 @@
                         <option value="icash">icash</option>
                         <option value="ipassmoney">iPass Money</option>
                         <option value="學生證">學生證</option>
-                        <option value="一卡通">一卡通</option>
                         <option value="待付款">⚠️ 待付款</option>
                     </select>
                 </label>
@@ -178,7 +177,6 @@
                         <option value="icash">icash</option>
                         <option value="ipassmoney">iPass Money</option>
                         <option value="學生證">學生證</option>
-                        <option value="一卡通">一卡通</option>
                         <option value="待付款">還債</option>
                         <option value="富邦證券">證券</option>
                         <option value="中國信託">中國信託</option>
@@ -240,6 +238,7 @@
                     <optgroup label="💳 依帳戶">
                         <option value="ACC_錢包">錢包</option>
                         <option value="ACC_中國信託">中國信託</option>
+                        <option value="學生證">學生證</option>
                         <option value="ACC_郵局">郵局</option>
                         <option value="ACC_富邦銀行">富邦銀行</option>
                         <option value="ACC_悠遊卡">悠遊卡</option>
@@ -709,37 +708,68 @@
         });
     }
 
-    // --- 功能 6 (升級版)：讀取記帳列表 (含刪除按鈕) ---
+    // --- 功能 6 (完全體)：讀取記帳 + 篩選 + 刪除按鈕 ---
+    
+    // 1. 下載並存檔
     function loadExpenses() {
         fetch(API_URL + "?tab=Expenses_DB").then(res => res.json()).then(data => {
-            const list = document.getElementById('expenseList'); list.innerHTML = ""; 
-            if(data.length === 0) { list.innerHTML = "<li style='color:#ccc'>無紀錄</li>"; return; }
+            globalExpensesData = data; // 存入全域變數
+            renderExpenseList();       // 初始繪製
+        });
+    }
+
+    // 2. 渲染列表 (包含篩選邏輯 & 刪除按鈕)
+    function renderExpenseList() {
+        const list = document.getElementById('expenseList'); 
+        // 抓取下拉選單的值，如果 HTML 還沒更新選單，就預設 "ALL"
+        const filterEl = document.getElementById('recordFilter');
+        const filterVal = filterEl ? filterEl.value : "ALL"; 
+        
+        list.innerHTML = ""; 
+        
+        if(globalExpensesData.length === 0) { 
+            list.innerHTML = "<li style='color:#ccc'>無紀錄</li>"; 
+            return; 
+        }
+
+        // --- 核心篩選邏輯 ---
+        let filteredData = globalExpensesData.filter(row => {
+            if (filterVal === "ALL") return true; 
+            if (filterVal.startsWith("CAT_")) return row.類別 === filterVal.replace("CAT_", "");
+            if (filterVal.startsWith("ACC_")) return row.帳戶 === filterVal.replace("ACC_", "");
+            return true;
+        });
+
+        // 取最後 10 筆並反轉
+        const displayData = filteredData.slice(-10).reverse();
+
+        if (displayData.length === 0) {
+            list.innerHTML = "<li style='color:#ccc; text-align:center; padding:10px;'>此條件下無紀錄</li>";
+            return;
+        }
+
+        displayData.forEach(row => {
+            const color = row.收支 === "收入" ? "#4caf50" : "#e91e63"; 
+            const sign = row.收支 === "收入" ? "+" : "-";
             
-            // 取最後 10 筆並反轉
-            data.slice(-10).reverse().forEach(row => {
-                const color = row.收支 === "收入" ? "#4caf50" : "#e91e63"; 
-                const sign = row.收支 === "收入" ? "+" : "-";
-                
-                // 產生一個不重複的 ID 方便操作
-                // 這裡傳入 row 的原始資料給 deleteExpense 函式
-                let dateStr = formatDate(row.日期); 
-                
-                list.innerHTML += `
-                    <li style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                        <div style="flex:1;">
-                            <span style="font-weight:bold; color:#555;">${row.項目}</span>
-                            <span style="font-size:0.85em; color:#999; margin-left:5px;">(${dateStr})</span>
-                            <br>
-                            <span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.類別}</span>
-                            <span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.帳戶}</span>
-                        </div>
-                        <div style="font-weight:bold; color:${color}; margin-right:15px;">${sign}$${Number(row.金額).toLocaleString()}</div>
-                        
-                        <button onclick="deleteExpense('${dateStr}', '${row.項目}', '${row.金額}', this)" style="background:#ffebee; color:#c62828; padding:5px 10px; font-size:0.8rem; border-radius:5px; box-shadow:none; border:1px solid #ffcdd2;">
-                            🗑️
-                        </button>
-                    </li>`;
-            });
+            // 產生刪除所需的參數
+            let dateStr = formatDate(row.日期); 
+            
+            list.innerHTML += `
+                <li style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="flex:1;">
+                        <span style="font-weight:bold; color:#555;">${row.項目}</span>
+                        <span style="font-size:0.85em; color:#999; margin-left:5px;">(${dateStr})</span>
+                        <br>
+                        <span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.類別}</span>
+                        <span style="font-size:0.85em; background:#f0f0f0; padding:2px 6px; border-radius:4px;">${row.帳戶}</span>
+                    </div>
+                    <div style="font-weight:bold; color:${color}; margin-right:10px;">${sign}$${Number(row.金額).toLocaleString()}</div>
+                    
+                    <button onclick="deleteExpense('${dateStr}', '${row.項目}', '${row.金額}', this)" style="background:#ffebee; color:#c62828; padding:5px 10px; font-size:0.8rem; border-radius:5px; box-shadow:none; border:1px solid #ffcdd2;">
+                        🗑️
+                    </button>
+                </li>`;
         });
     }
 
