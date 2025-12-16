@@ -1061,38 +1061,114 @@
         });
     }
 
-    // --- 功能 16：時間倒數 ---
-    const MY_EVENTS = [{ title: "🎓 距離畢業", date: "2026-06-30", type: "fixed" }, { title: "🎂 下次生日", date: "10-25", type: "yearly" }];
+    // --- 🟢 功能 16 (優化版)：倒數日 (當天顯示慶祝) ---
     function loadTimeWidget() {
-        const c = document.getElementById('timeContainer'); if(!c) return;
-        const now = new Date(), currentYear = now.getFullYear();
-        const start = new Date(currentYear, 0, 1), end = new Date(currentYear+1, 0, 1);
-        const percent = ((now - start) / (end - start)) * 100;
-        let html = `<div><div style="display:flex;justify-content:space-between;font-size:0.9em;margin-bottom:5px;"><span>${currentYear}年 已過</span><span>${percent.toFixed(1)}%</span></div><div style="width:100%;background:rgba(255,255,255,0.2);border-radius:10px;height:8px;"><div style="height:100%;background:#fff;width:${percent}%;border-radius:10px;"></div></div></div>`;
+        const container = document.getElementById('timeContainer');
+        if(!container) return;
         
-        fetch(API_URL + "?tab=Events_DB").then(r=>r.json()).then(data => {
-            if(data.length > 0) {
-                data.forEach(e => {
-                    let dStr = String(e.日期).replace(/\//g, "-").split("T")[0], tDate;
-                    if(e.類型==="fixed") tDate = new Date(dStr);
-                    else { let [m,d] = (dStr.includes("-")?dStr.slice(-5):dStr).split('-'); tDate = new Date(currentYear, m-1, d); if(now>tDate) tDate.setFullYear(currentYear+1); }
-                    let diff = Math.ceil((tDate-now)/(1000*60*60*24));
-                    if(diff>=0 || e.類型!=="fixed") html += `<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.1);padding:10px 15px;border-radius:10px;margin-top:10px;"><div><div style="font-size:0.85em;opacity:0.8;">${e.事件名稱||e.title}</div><div style="font-size:1.1em;font-weight:bold;">${formatDate(tDate)}</div></div><div style="text-align:right;"><div style="font-size:0.85em;opacity:0.8;">還剩</div><div style="font-size:1.5em;font-weight:bold;color:#ffeb3b;">${diff} <span style="font-size:0.6em;">天</span></div></div></div>`;
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const startOfYear = new Date(currentYear, 0, 1);
+        const endOfYear = new Date(currentYear + 1, 0, 1);
+        const yearPercent = ((now - startOfYear) / (endOfYear - startOfYear)) * 100;
+        
+        let html = `
+            <div>
+                <div style="display:flex; justify-content:space-between; font-size:0.9em; margin-bottom:5px;">
+                    <span>${currentYear}年 已過</span>
+                    <span>${yearPercent.toFixed(1)}%</span>
+                </div>
+                <div style="width:100%; background:rgba(255,255,255,0.2); border-radius:10px; height:8px;">
+                    <div style="height:100%; background:#fff; width:${yearPercent}%; border-radius:10px; transition:width 1s;"></div>
+                </div>
+            </div>
+        `;
+
+        fetch(API_URL + "?tab=Events_DB")
+            .then(res => res.json())
+            .then(data => {
+                if(data.length === 0) {
+                    container.innerHTML = html + "<div style='text-align:center; font-size:0.8em; opacity:0.7; margin-top:10px;'>尚無倒數事件</div>";
+                    return;
+                }
+
+                data.forEach(event => {
+                    let targetDate;
+                    let evtTitle = event['事件名稱'] || event['title']; 
+                    let evtDate = event['日期'] || event['date'];
+                    let evtType = event['類型'] || event['type'];
+
+                    let dateStr = String(evtDate).replace(/\//g, "-").split("T")[0];
+
+                    if (evtType === "fixed") {
+                        targetDate = new Date(dateStr);
+                    } else {
+                        // 每年重複的邏輯
+                        let shortDate = dateStr.includes("-") ? dateStr.slice(-5) : dateStr; 
+                        const [m, d] = shortDate.split('-');
+                        targetDate = new Date(currentYear, m - 1, d);
+                        
+                        // 這裡做個小修正：如果是今天(diff=0)，不要急著跳明年，讓它顯示完「就是今天」再跳
+                        // 所以我們只在 "昨天以前" (now > targetDate + 1天) 才跳明年
+                        let tomorrow = new Date(targetDate);
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        
+                        if (now > tomorrow) {
+                            targetDate.setFullYear(currentYear + 1);
+                        }
+                    }
+
+                    // 計算差距
+                    const diffTime = targetDate - now;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                    // 過期不顯示 (fixed 類)
+                    if (diffDays < 0 && evtType === "fixed") return; 
+
+                    let displayDate = formatDate(targetDate);
+                    
+                    // 🟢 關鍵修改：判斷是否為今天
+                    let dayText = "";
+                    let dayColor = "#ffeb3b"; // 預設黃色
+
+                    if (diffDays === 0) {
+                        dayText = "🎉 就是今天！";
+                        dayColor = "#4ade80"; // 綠色
+                    } else if (diffDays > 0) {
+                        dayText = `${diffDays} <span style="font-size:0.6em;">天</span>`;
+                    } else {
+                        // 理論上 fixed < 0 會 return，這裡是以防萬一
+                        dayText = "已結束";
+                        dayColor = "#ccc";
+                    }
+
+                    html += `
+                        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.1); padding:10px 15px; border-radius:10px;">
+                            <div>
+                                <div style="font-size:0.85em; opacity:0.8;">${evtTitle}</div>
+                                <div style="font-size:1.1em; font-weight:bold;">${displayDate}</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-size:0.85em; opacity:0.8;">${diffDays === 0 ? "Status" : "還剩下"}</div>
+                                <div style="font-size:1.5em; font-weight:bold; color:${dayColor};">
+                                    ${dayText}
+                                </div>
+                            </div>
+                        </div>
+                    `;
                 });
-            }
-            c.innerHTML = html;
-        }).catch(()=> c.innerHTML = html);
-    }
-    function toggleEventForm() { const f = document.getElementById('eventForm'); f.style.display = f.style.display==="none"?"flex":"none"; }
-    function submitEvent() { 
-        const btn = event.target; btn.disabled=true; 
-        const payload = { tab:"Events_DB", title:document.getElementById('evtTitle').value, date:document.getElementById('evtDate').value, type:document.getElementById('evtType').value };
-        fetch(API_URL, {method:'POST', body:JSON.stringify(payload)}).then(r=>r.text()).then(d=>{ if(d.includes("Success")){alert("成功"); toggleEventForm(); loadTimeWidget();} btn.disabled=false; }); 
+                
+                container.innerHTML = html;
+            })
+            .catch(err => {
+                console.error(err);
+                container.innerHTML = html;
+            });
     }
 
-    // --- 功能 18 (修正版)：夢想購物車 (讀取全域變數) ---
+    // --- 功能 18 (升級版)：夢想購物車 (含刪除 & 購買自動刪除) ---
     function loadWishlist() {
-        // 🟢 關鍵修改：直接使用全域變數，不再讀取 DOM
+        // 讀取全域變數中的資金
         let currentCash = globalLivingFunds;
 
         fetch(API_URL + "?tab=Wishlist_DB").then(res => res.json()).then(data => {
@@ -1100,21 +1176,28 @@
             if(!container) return;
             container.innerHTML = "";
             
-            if(data.length === 0) { container.innerHTML = "<div style='color:#ccc;text-align:center;'>無願望</div>"; return; }
+            if(data.length === 0) { container.innerHTML = "<div style='color:#ccc;text-align:center;'>目前沒有願望</div>"; return; }
             
             data.forEach((row, index) => {
-                let itemName = row['項目名稱']||row['項目']||"", price = Number(row['預估金額']||row['金額']||0);
+                let itemName = row['項目名稱']||row['項目']||"";
+                let price = Number(row['預估金額']||row['金額']||0);
+                // 🟢 取得日期，因為後端刪除需要比對日期
+                let dateStr = formatDate(row['日期']); 
+
                 let diff = currentCash - price;
-                
                 let bg = diff >= 0 ? '#e8f5e9' : '#fff'; // 買得起顯示淡綠底
                 let status = diff >= 0 ? 
                     `<span style="color:#2e7d32;font-weight:bold;">✅ 可購買 (剩 $${diff.toLocaleString()})</span>` : 
                     `<span style="color:#c62828;">❌ 差 $${Math.abs(diff).toLocaleString()}</span>`;
                 
-                let btn = diff >= 0 ? 
-                    `<button onclick="fillExpense('${itemName}', '${price}', this)" style="padding:5px 10px;font-size:0.8em;background:#4caf50;">購買</button>` : 
+                // 🟢 修改購買按鈕：多傳入 dateStr
+                let buyBtn = diff >= 0 ? 
+                    `<button onclick="fillExpense('${dateStr}', '${itemName}', '${price}', this)" style="padding:5px 10px;font-size:0.8em;background:#4caf50;color:white;border:none;border-radius:5px;cursor:pointer;">購買</button>` : 
                     ``;
                 
+                // 🟢 新增刪除按鈕
+                let deleteBtn = `<button onclick="deleteWish('${dateStr}', '${itemName}', '${price}', this)" style="padding:5px 8px;font-size:0.8em;background:#ffebee;color:#c62828;border:1px solid #ffcdd2;border-radius:5px;margin-left:5px;cursor:pointer;">🗑️</button>`;
+
                 container.innerHTML += `
                     <div id="wish-${index}" style="background:${bg};padding:12px;border-radius:8px;border:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
                         <div>
@@ -1122,22 +1205,123 @@
                             <div style="font-size:0.9em;color:#666;">$${price.toLocaleString()}</div>
                             <div style="margin-top:2px;font-size:0.9em;">${status}</div>
                         </div>
-                        <div>${btn}</div>
+                        <div style="display:flex; align-items:center;">
+                            ${buyBtn}
+                            ${deleteBtn}
+                        </div>
                     </div>`;
             });
         });
     }
-    function toggleWishForm() { const f = document.getElementById('wishForm'); f.style.display = f.style.display==="none"?"flex":"none"; }
-    function submitWish() {
-        const btn = event.target; btn.disabled=true;
-        const vals = { tab:"Wishlist_DB", date:new Date().toISOString().split('T')[0], item:document.getElementById('wishItem').value, amount:document.getElementById('wishAmount').value, note:document.getElementById('wishNote').value };
-        fetch(API_URL, {method:'POST', body:JSON.stringify(vals)}).then(r=>r.text()).then(d=>{ if(d.includes("Success")){alert("成功"); toggleWishForm(); loadWishlist();} btn.disabled=false; });
+
+    // --- 許願表單切換 ---
+    function toggleWishForm() { 
+        const f = document.getElementById('wishForm'); 
+        f.style.display = f.style.display === "none" ? "flex" : "none"; 
     }
-    function fillExpense(item, price, el) {
-        document.getElementById('expItem').value = item; document.getElementById('expAmount').value = price; document.getElementById('expType').value = "支出";
-        switchTab('expenses'); document.getElementById('expItem').scrollIntoView({behavior:"smooth"});
-        if(el) { let card = el.closest('div[id^="wish-"]'); if(card) { card.style.opacity="0"; setTimeout(()=>card.remove(), 500); } }
-        alert("已帶入記帳區！請記得去 Excel 刪除願望。");
+
+    // --- 送出許願 ---
+    function submitWish() {
+        const btn = event.target; btn.disabled = true;
+        
+        // 簡單防呆
+        const itemVal = document.getElementById('wishItem').value;
+        const amtVal = document.getElementById('wishAmount').value;
+        if(!itemVal || !amtVal) { alert("請填寫完整"); btn.disabled=false; return; }
+
+        const vals = { 
+            tab: "Wishlist_DB", 
+            date: new Date().toISOString().split('T')[0], 
+            item: itemVal, 
+            amount: amtVal, 
+            note: document.getElementById('wishNote').value 
+        };
+
+        fetch(API_URL, {method:'POST', body:JSON.stringify(vals)})
+        .then(r=>r.text())
+        .then(d=>{ 
+            if(d.includes("Success")){
+                alert("✨ 許願成功！"); 
+                // 清空欄位
+                document.getElementById('wishItem').value="";
+                document.getElementById('wishAmount').value="";
+                document.getElementById('wishNote').value="";
+                
+                toggleWishForm(); 
+                loadWishlist();
+            } 
+            btn.disabled = false; 
+        });
+    }
+
+    // --- 🟢 購買並自動刪除 ---
+    function fillExpense(date, item, price, btnElement) {
+        if(!confirm(`🎉 恭喜達成願望！\n\n系統將會：\n1. 把「${item}」帶入記帳頁面\n2. 從願望清單中移除此項目\n\n確定嗎？`)) return;
+
+        // 1. 填入記帳區
+        document.getElementById('expItem').value = item; 
+        document.getElementById('expAmount').value = price; 
+        document.getElementById('expType').value = "支出";
+        
+        // 2. 切換頁面
+        switchTab('expenses'); 
+        document.getElementById('expItem').scrollIntoView({behavior:"smooth"});
+        
+        // 3. 視覺刪除 (移除卡片)
+        if(btnElement) { 
+            let card = btnElement.closest('div[id^="wish-"]'); 
+            if(card) { 
+                card.style.transition = "opacity 0.5s";
+                card.style.opacity = "0"; 
+                setTimeout(()=>card.remove(), 500); 
+            } 
+        }
+        
+        // 4. 後台刪除指令
+        const payload = {
+            action: "delete",
+            tab: "Wishlist_DB",
+            date: date,
+            item: item,
+            amount: price
+        };
+        // 靜默發送刪除請求
+        fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
+
+        alert("已帶入記帳區！\n該願望已從後台清單中移除。");
+    }
+
+    // --- 🟢 純刪除願望 ---
+    function deleteWish(date, item, amount, btn) {
+        if(!confirm(`確定要放棄「${item}」這個願望嗎？`)) return;
+
+        btn.innerText = "⏳";
+        btn.disabled = true;
+
+        const payload = {
+            action: "delete",
+            tab: "Wishlist_DB",
+            date: date,
+            item: item,
+            amount: amount
+        };
+
+        fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
+        .then(res => res.text())
+        .then(data => {
+            if(data.includes("Deleted")) {
+                let card = btn.closest('div[id^="wish-"]');
+                card.style.opacity = "0";
+                setTimeout(() => {
+                    card.remove();
+                    alert("🗑️ 願望已移除！");
+                }, 500);
+            } else {
+                alert("刪除失敗：" + data);
+                btn.innerText = "🗑️";
+                btn.disabled = false;
+            }
+        });
     }
 
     // --- 🟢 功能 20 (除錯版)：刪除記帳紀錄 ---
