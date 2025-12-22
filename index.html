@@ -605,162 +605,172 @@
         });
     }
 
-    // --- 功能 4 (總報酬版)：解決部分買賣的 ROI 計算 ---
-    function loadAssetChart() {
-        Promise.all([
-            fetch(API_URL + "?tab=Portfolio").then(res => res.json()),
-            fetch(API_URL + "?tab=Asset_Log").then(res => res.json())
-        ]).then(([portfolioData, logData]) => {
+    // --- 功能 4：資產圓餅圖與列表 (終極精確版：包含已實現交易損益) ---
+function loadAssetChart() {
+    Promise.all([
+        fetch(API_URL + "?tab=Portfolio").then(res => res.json()),
+        fetch(API_URL + "?tab=Asset_Log").then(res => res.json())
+    ]).then(([portfolioData, logData]) => {
+        
+        // --- 變數初始化 ---
+        let currentTotalAssets = 0; // 總資產 (含銀行/郵局)
+        let investMarketValue = 0;  // 投資現值 (只含股票/幣)
+        
+        // 1. 成本面 (來自 Asset_Log 富邦證券)
+        let remainingCost = 0;      // 剩餘庫存成本 (富邦證券 Net Sum)
+        let soldCost = 0;           // 已賣出股票的成本 (富邦證券 負數的絕對值)
+        
+        // 2. 收入面 (來自 Asset_Log 銀行端)
+        let totalDividends = 0;     // 股利
+        let sellIncome = 0;         // 賣股收到的現金 (交易收入)
+        
+        let categoryMap = {};       
+        
+        // --- 步驟 1: 處理 Asset_Log (拆解 成本 與 收入) ---
+        logData.forEach(row => {
+            let account = (row['帳戶'] || "").toString();
+            let amount = Number(row['金額'] || 0);
+            let name = (row['項目名稱'] || "").toString();
+            let cat = row['資產類別'];
+            let type = row['交易型態']; // "流入" 或 "流出"
             
-            let currentMarketValue = 0; // 總資產 (含銀行/現金)
-            let investMarketValue = 0;  // 投資現值 (股票/虛擬幣/黃金的當下市值)
-            let labels = [], values = [], colors = [];
-            const palette = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#E7E9ED', '#76D7C4', '#F1948A'];
-            
-            // 🟢 變數分離：全域統計
-            let totalInvestedCapital = 0; // 歷史總投入本金 (只加買入，不扣賣出)
-            let totalCashBack = 0;        // 總回收資金 (賣出 + 股利)
-            let costMap = {};             // 個別項目的成本 (用來算個別持股)
+            if (name && cat) categoryMap[name] = cat;
 
-            logData.forEach(row => {
-                let cat = row.資產類別||"", item = row.項目名稱||row.項目||"", type = row.交易型態||row.型態||"", amt = Number(row.金額);
+            // --- A. 處理成本 (富邦證券) ---
+            if (account === "富邦證券") {
+                // 1. 累加剩餘成本 (買進是正，賣出是負，加總=剩餘成本)
+                remainingCost += amount;
                 
-                // 判斷是否為投資相關
-                let isInvestItem = (
-                    cat.includes("股票") || cat.includes("Stock") || cat.includes("加密貨幣") || 
-                    item.match(/00\d\d|黃金|BTC|ETH|Stock|股利|配息|股息|Dividend/i)
-                );
-                let isDividend = item.match(/股利|配息|股息|Dividend/i);
-                
-                if (isInvestItem) {
-                    if (cat.includes("現金") && !isDividend) return;
-
-                    if (!costMap[item]) costMap[item] = 0;
-                    
-                    if (type.includes("流入") || type.includes("買入")) {
-                        if (isDividend) {
-                            // 股利 = 回收資金
-                            totalCashBack += Math.abs(amt);
-                        } else {
-                            // 買入 = 增加投入本金
-                            totalInvestedCapital += Math.abs(amt);
-                            // 個別成本增加
-                            costMap[item] += Math.abs(amt);
-                        }
-                    }
-                    else if (type.includes("流出") || type.includes("賣出")) {
-                        // 賣出 = 回收資金
-                        totalCashBack += Math.abs(amt);
-                        // 個別成本減少 (為了計算個別持股的剩餘成本)
-                        costMap[item] -= Math.abs(amt);
-                    }
+                // 2. 統計已賣出的成本 (抓出負數的部分)
+                if (amount < 0) {
+                    soldCost += Math.abs(amount); // 轉成正數，代表「這筆交易的成本是多少」
                 }
-            });
-
-            globalSnapshotData = []; 
-            let tableHtml = "";
-
-            // 2. 處理 Portfolio (計算現值)
-            portfolioData.forEach((row, i) => {
-                let itemName = row['項目名稱'];
-                let mv = Number(row['總市值'] || 0);
-                let qty = Number(row['持有數量'] || 0);
-                let priceNow = Number(row['即時單價'] || 0); 
-                let priceYest = Number(row['昨日收盤'] || row['即時單價'] || 0); 
-
-                let cost = costMap[itemName] || 0;
-                let cat = ""; 
-                if(itemName.match(/00\d\d|Stock/)) cat = "股票";
-                else if(itemName.match(/BTC|ETH/)) cat = "加密貨幣";
-                else if(itemName.match(/黃金/)) cat = "黃金";
-
-                if (mv > 0) {
-                    currentMarketValue += mv;
-                    
-                    let isInvest = (cat.includes("股票") || itemName.match(/00\d\d|黃金|BTC|ETH|Stock/i));
-                    // 只有投資類別才算入 ROI 的分子
-                    if (isInvest) {
-                        investMarketValue += mv;
-                    }
-
-                    labels.push(itemName); values.push(mv); colors.push(palette[i % palette.length]);
-                    
-                    // 單日漲跌計算
-                    let unit = "單位";
-                    if(cat.includes("股票") || itemName.match(/00\d\d/)) unit = "股";
-                    if(cat.includes("加密") || itemName.includes("BTC")) unit = "顆";
-                    if(itemName.includes("黃金")) unit = "克";
-                    let qtyDisplay = (unit === "股") ? qty.toLocaleString() : qty;
-
-                    let dayChange = (priceNow - priceYest) * qty;
-                    let changeColor = dayChange > 0 ? "#ff4d4f" : (dayChange < 0 ? "#52c41a" : "#999");
-                    let changeSign = dayChange > 0 ? "▲ +" : (dayChange < 0 ? "▼ " : "");
-                    let changeText = (dayChange !== 0 && Math.abs(priceNow - 1) > 0.01) ? 
-                        `<div style="color:${changeColor}; font-size:0.85em; margin-top:3px;">${changeSign}$${Math.abs(Math.round(dayChange)).toLocaleString()}</div>` : 
-                        `<div style="color:#ccc; font-size:0.8em; margin-top:3px;">-</div>`;
-
-                    tableHtml += `
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 12px 5px; font-weight:bold; color:#333;">
-                                <span style="display:inline-block; width:10px; height:10px; background:${palette[i % palette.length]}; margin-right:5px; border-radius:50%;"></span>
-                                ${itemName}
-                            </td>
-                            <td style="padding: 12px 5px; text-align: right; color:#555;">
-                                ${qtyDisplay} <span style="font-size:0.8em; color:#999;">${unit}</span>
-                            </td>
-                            <td style="padding: 12px 5px; text-align: right;">
-                                <div style="font-weight:bold;">$${mv.toLocaleString()}</div>
-                                ${changeText}
-                            </td>
-                        </tr>
-                    `;
+            } 
+            // --- B. 處理收入 (非證券帳戶，如富邦銀行) ---
+            else {
+                // 3. 抓股利
+                if (name.includes("股利")) {
+                    totalDividends += amount;
                 }
-
-                if (mv > 0 || cat.includes("股票")) {
-                    globalSnapshotData.push({ item: itemName, qty: qty, mv: mv, cost: cost });
+                // 4. 抓賣出收入
+                // 邏輯：如果是股票/幣 且 是流入 且 不是股利 -> 視為賣出收入
+                // (或者您可以明確搜尋名稱包含 "賣出" 的項目)
+                let isInvestItem = name.match(/00|Stock|BTC|ETH|黃金|賣出/);
+                if (isInvestItem && type === "流入" && !name.includes("股利")) {
+                    sellIncome += amount;
                 }
-            });
-            
-            // 寫入表格
-            const tableBody = document.getElementById('holdingsTableBody');
-            if(tableBody) {
-                if(tableHtml === "") tableHtml = "<tr><td colspan='3' style='text-align:center; padding:20px; color:#ccc;'>目前沒有持股</td></tr>";
-                tableBody.innerHTML = tableHtml;
             }
-
-            // 更新 UI
-            globalSnapshotData.push({ item: "總資產", qty: 1, mv: currentMarketValue, cost: totalInvestedCapital });
-            globalTotalAssets = currentMarketValue;
-            let percent = Math.min(100, Math.round((currentMarketValue / SAVING_GOAL) * 100));
-            document.getElementById('goalProgressBar').style.width = percent + "%";
-            document.getElementById('goalPercent').innerText = percent + "%";
-            document.getElementById('totalAssetsDisplay').innerText = "$" + currentMarketValue.toLocaleString();
-            
-            // 🟢 修正顯示：這裡顯示「淨投入成本」(本金 - 已回收)
-            // 這樣你可以知道「還卡在股市裡的錢」有多少
-            let netCost = totalInvestedCapital - totalCashBack;
-            document.getElementById('totalCostDisplay').innerText = "$" + netCost.toLocaleString();
-            
-            // 🟢 總損益 = (目前市值 + 總回收) - 總投入
-            let profit = (investMarketValue + totalCashBack) - totalInvestedCapital;
-            
-            // 🟢 ROI = 總損益 / 總投入本金
-            let roi = totalInvestedCapital > 0 ? (profit / totalInvestedCapital) * 100 : 0;
-            
-            let pEl = document.getElementById('totalProfitDisplay');
-            pEl.innerText = (profit >= 0 ? "+" : "") + "$" + profit.toLocaleString();
-            pEl.style.color = profit >= 0 ? "#ff9999" : "#99ff99";
-
-            let rEl = document.getElementById('roiDisplay');
-            rEl.innerText = (roi >= 0 ? "+" : "") + roi.toFixed(2) + "%";
-            rEl.style.color = roi >= 0 ? "#ff9999" : "#99ff99";
-
-            const ctx = document.getElementById('assetPieChart');
-            if(assetChart) assetChart.destroy();
-            assetChart = new Chart(ctx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: values, backgroundColor: colors }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' }, datalabels: { display: true, color: '#fff', font: { weight: 'bold', size: 11 }, formatter: (value, ctx) => { let sum = 0; let dataArr = ctx.chart.data.datasets[0].data; dataArr.map(data => { sum += data; }); let percentage = (value * 100 / sum).toFixed(1) + "%"; if((value * 100 / sum) < 3) return ""; return percentage; } } } } });
         });
-    }
-    
+
+        // Debug: 看看抓到的數字對不對
+        console.log("剩餘成本:", remainingCost);
+        console.log("已實現交易 -> 收入:", sellIncome, " 成本:", soldCost);
+        console.log("交易損益:", sellIncome - soldCost);
+
+        // --- 步驟 2: 處理 Portfolio ---
+        let labels = [], values = [], colors = [];
+        const palette = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#E7E9ED', '#76D7C4', '#F1948A'];
+        
+        globalSnapshotData = []; 
+        let tableHtml = "";
+
+        portfolioData.forEach((row, i) => {
+            let itemName = (row['項目名稱'] || "").toString();
+            let mv = Number(row['總市值'] || 0);
+            let qty = Number(row['持有數量'] || 0);
+            let priceNow = Number(row['即時單價'] || 0); 
+            let priceYest = Number(row['昨日收盤'] || row['即時單價'] || 0); 
+            
+            let isCashSavings = itemName.includes("郵局") || itemName.includes("富邦銀行") || itemName.includes("現金");
+
+            if (mv > 0) {
+                currentTotalAssets += mv;
+                
+                // 計算未實現損益用的「現值」 (排除存款)
+                if (!isCashSavings) {
+                    investMarketValue += mv;
+                }
+
+                labels.push(itemName); 
+                values.push(mv); 
+                colors.push(palette[i % palette.length]);
+                globalSnapshotData.push({ item: itemName, qty: qty, mv: mv, cost: 0 });
+
+                let unit = "單位";
+                if (itemName.match(/00|Stock/)) unit = "股";
+                else if (itemName.match(/BTC|ETH/)) unit = "顆";
+                else if (itemName.match(/黃金/)) unit = "克";
+                let qtyDisplay = (unit === "股") ? qty.toLocaleString() : qty;
+
+                let dayChange = (priceNow - priceYest) * qty;
+                let changeColor = dayChange > 0 ? "#ff4d4f" : (dayChange < 0 ? "#52c41a" : "#999");
+                let changeSign = dayChange > 0 ? "▲ +" : (dayChange < 0 ? "▼ " : "");
+                let showChange = (dayChange !== 0 && Math.abs(priceNow - 1) > 0.01 && !isCashSavings);
+
+                let changeText = showChange ? 
+                    `<div style="color:${changeColor}; font-size:0.85em; margin-top:3px;">${changeSign}$${Math.abs(Math.round(dayChange)).toLocaleString()}</div>` : 
+                    `<div style="color:#ccc; font-size:0.8em; margin-top:3px;">-</div>`;
+
+                tableHtml += `
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 12px 5px; font-weight:bold; color:#333;">
+                            <span style="display:inline-block; width:10px; height:10px; background:${palette[i % palette.length]}; margin-right:5px; border-radius:50%;"></span>
+                            ${itemName}
+                        </td>
+                        <td style="padding: 12px 5px; text-align: right; color:#555;">${qtyDisplay} <span style="font-size:0.8em; color:#999;">${unit}</span></td>
+                        <td style="padding: 12px 5px; text-align: right;">
+                            <div style="font-weight:bold;">$${mv.toLocaleString()}</div>${changeText}
+                        </td>
+                    </tr>`;
+            }
+        });
+        
+        // --- 步驟 3: 最終計算 ---
+        const tableBody = document.getElementById('holdingsTableBody');
+        if(tableBody) tableBody.innerHTML = tableHtml || "<tr><td colspan='3' style='text-align:center;'>無資產</td></tr>";
+
+        // 1. 總資產
+        globalTotalAssets = currentTotalAssets;
+        document.getElementById('totalAssetsDisplay').innerText = "$" + currentTotalAssets.toLocaleString();
+        
+        let percent = Math.min(100, Math.round((currentTotalAssets / SAVING_GOAL) * 100));
+        document.getElementById('goalProgressBar').style.width = percent + "%";
+        document.getElementById('goalPercent').innerText = percent + "%";
+        
+        // 2. 總成本 (顯示目前庫存的成本)
+        document.getElementById('totalCostDisplay').innerText = "$" + remainingCost.toLocaleString();
+        
+        // 3. 總損益 (Total Profit)
+        // 公式 = (未實現損益) + (已實現交易損益) + (股利)
+        // 未實現 = investMarketValue - remainingCost
+        // 已實現交易 = sellIncome - soldCost
+        
+        let unrealizedProfit = investMarketValue - remainingCost;
+        let realizedTradingProfit = sellIncome - soldCost;
+        
+        let totalProfit = unrealizedProfit + realizedTradingProfit + totalDividends;
+        
+        // 4. ROI
+        // 分母使用 remainingCost 代表「目前投入的資金效率」
+        // 或者使用 (remainingCost + soldCost) 代表「歷史總投入」，通常看目前庫存會用 remainingCost
+        let roiBase = remainingCost > 0 ? remainingCost : 1; 
+        let roi = (totalProfit / roiBase) * 100;
+        
+        let pEl = document.getElementById('totalProfitDisplay');
+        pEl.innerText = (totalProfit >= 0 ? "+" : "") + "$" + totalProfit.toLocaleString();
+        pEl.style.color = totalProfit >= 0 ? "#ff9999" : "#99ff99";
+
+        let rEl = document.getElementById('roiDisplay');
+        rEl.innerText = (roi === 999 ? "∞" : ((roi >= 0 ? "+" : "") + roi.toFixed(2))) + "%";
+        rEl.style.color = roi >= 0 ? "#ff9999" : "#99ff99";
+
+        // 更新圖表
+        const ctx = document.getElementById('assetPieChart');
+        if(assetChart) assetChart.destroy();
+        assetChart = new Chart(ctx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: values, backgroundColor: colors }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' }, datalabels: { display: true, color: '#fff', font: { weight: 'bold', size: 11 }, formatter: (value, ctx) => { let sum = 0; let dataArr = ctx.chart.data.datasets[0].data; dataArr.map(data => { sum += data; }); let percentage = (value * 100 / sum).toFixed(1) + "%"; if((value * 100 / sum) < 3) return ""; return percentage; } } } } });
+    });
+}
+
     // --- 功能 5：送出日常記帳 ---
     function submitExpense() {
         const btn = document.getElementById('btnExp');
