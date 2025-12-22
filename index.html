@@ -605,135 +605,140 @@
         });
     }
 
-    // --- 功能 4 (修改版)：計算 ROI + 圓餅圖 + 顯示股數 ---
-function loadAssetChart() {
-    Promise.all([
-        fetch(API_URL + "?tab=Portfolio").then(res => res.json()),
-        fetch(API_URL + "?tab=Asset_Log").then(res => res.json())
-    ]).then(([portfolioData, logData]) => {
-        
-        let currentMarketValue = 0; 
-        let labels = [], values = [], colors = [];
-        const palette = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#E7E9ED', '#76D7C4', '#F1948A'];
-        
-        let costMap = {};
-        logData.forEach(row => {
-            let cat = row.資產類別||"", item = row.項目名稱||row.項目||"", type = row.交易型態||row.型態||"", amt = Number(row.金額);
-            if ((cat.includes("股票") || cat.includes("Stock") || item.includes("黃金") || item.includes("BTC")) && !cat.includes("現金")) {
-                if(!costMap[item]) costMap[item] = 0;
-                if (type.includes("流入") || type.includes("買入")) costMap[item] += Math.abs(amt); 
-                else if (type.includes("流出") || type.includes("賣出")) costMap[item] -= Math.abs(amt); 
-            }
-        });
-
-        globalSnapshotData = []; 
-        let totalInvestCost = 0;
-        
-        // 🟢 1. 準備表格的 HTML 字串變數
-        let tableHtml = "";
-
-        portfolioData.forEach((row, i) => {
-            let itemName = row['項目名稱'];
-            let mv = Number(row['總市值 (MarketValue)'] || row['總市值'] || 0);
+    // --- 功能 4 (完全對應版)：ROI + 圓餅圖 + 持股明細 (含單日漲跌) ---
+    function loadAssetChart() {
+        Promise.all([
+            fetch(API_URL + "?tab=Portfolio").then(res => res.json()),
+            fetch(API_URL + "?tab=Asset_Log").then(res => res.json())
+        ]).then(([portfolioData, logData]) => {
             
-            // 🟢 2. 抓取持有數量 (確保轉為數字)
-            let qty = Number(row['持有數量/金額'] || row['持有數量'] || 0);
+            let currentMarketValue = 0; 
+            let investMarketValue = 0;
+            let labels = [], values = [], colors = [];
+            const palette = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#E7E9ED', '#76D7C4', '#F1948A'];
             
-            let cost = costMap[itemName] || 0;
-            let cat = row['資產類別'] || ""; // 抓取類別，用來判斷單位
+            // 1. 計算歷史成本與股利 (維持原本邏輯)
+            let totalInvestCost = 0; 
+            let totalDividends = 0;
+            let costMap = {};
 
-            if (mv > 0) {
-                currentMarketValue += mv;
-                labels.push(itemName); values.push(mv); colors.push(palette[i % palette.length]);
+            logData.forEach(row => {
+                let cat = row.資產類別||"", item = row.項目名稱||row.項目||"", type = row.交易型態||row.型態||"", amt = Number(row.金額);
+                let isInvestItem = (cat.includes("股票") || cat.includes("Stock") || cat.includes("加密貨幣") || item.match(/00\d\d|黃金|BTC|ETH|Stock/i));
+                let isDividend = item.match(/股利|配息|股息|Dividend/i);
                 
-                // 🟢 3. 判斷單位 (股票用股，加密貨幣用顆，黃金用克)
-                let unit = "單位";
-                if (cat.includes("股票") || itemName.match(/00\d\d/)) unit = "股";
-                else if (cat.includes("加密") || itemName.includes("BTC") || itemName.includes("ETH")) unit = "顆";
-                else if (itemName.includes("黃金")) unit = "克";
-
-                // 🟢 4. 生成表格的一列 (Row)
-                tableHtml += `
-                    <tr style="border-bottom: 1px solid #eee;">
-                        <td style="padding: 12px 5px; font-weight:bold; color:#333;">
-                            <span style="display:inline-block; width:10px; height:10px; background:${palette[i % palette.length]}; margin-right:5px; border-radius:50%;"></span>
-                            ${itemName}
-                        </td>
-                        <td style="padding: 12px 5px; text-align: right; color:#555;">
-                            ${qty.toLocaleString()} <span style="font-size:0.8em; color:#999;">${unit}</span>
-                        </td>
-                        <td style="padding: 12px 5px; text-align: right; font-weight:bold;">
-                            $${mv.toLocaleString()}
-                        </td>
-                    </tr>
-                `;
-            }
-
-            if (mv > 0 || (row['資產類別'] && row['資產類別'].includes('股票'))) {
-                if(itemName.match(/00|黃金|BTC|ETH|Stock/)) totalInvestCost += cost;
-                globalSnapshotData.push({ item: itemName, qty: qty, mv: mv, cost: cost });
-            }
-        });
-        
-        // 🟢 5. 將生成的 HTML 寫入網頁
-        const tableBody = document.getElementById('holdingsTableBody');
-        if(tableBody) {
-            if(tableHtml === "") tableHtml = "<tr><td colspan='3' style='text-align:center; padding:20px; color:#ccc;'>目前沒有持股</td></tr>";
-            tableBody.innerHTML = tableHtml;
-        }
-
-        globalSnapshotData.push({ item: "總資產", qty: 1, mv: currentMarketValue, cost: totalInvestCost });
-        globalTotalAssets = currentMarketValue;
-
-        let percent = Math.min(100, Math.round((currentMarketValue / SAVING_GOAL) * 100));
-        const progBar = document.getElementById('goalProgressBar');
-        if(progBar) {
-            progBar.style.width = percent + "%";
-            document.getElementById('goalPercent').innerText = percent + "%";
-        }
-
-        document.getElementById('totalAssetsDisplay').innerText = "$" + currentMarketValue.toLocaleString();
-        document.getElementById('totalCostDisplay').innerText = "$" + totalInvestCost.toLocaleString();
-        
-        let profit = currentMarketValue - totalInvestCost;
-        let pEl = document.getElementById('totalProfitDisplay');
-        pEl.innerText = (profit >= 0 ? "+" : "") + "$" + profit.toLocaleString();
-        pEl.style.color = profit >= 0 ? "#ff9999" : "#99ff99";
-
-        let roi = totalInvestCost > 0 ? (profit / totalInvestCost) * 100 : 0;
-        let rEl = document.getElementById('roiDisplay');
-        rEl.innerText = (roi >= 0 ? "+" : "") + roi.toFixed(2) + "%";
-        rEl.style.color = roi >= 0 ? "#ff9999" : "#99ff99";
-
-        const ctx = document.getElementById('assetPieChart');
-        if(assetChart) assetChart.destroy();
-        
-        assetChart = new Chart(ctx, { 
-            type: 'doughnut', 
-            data: { labels: labels, datasets: [{ data: values, backgroundColor: colors }] }, 
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false, 
-                plugins: { 
-                    legend: { position: 'right' },
-                    datalabels: {
-                        display: true,
-                        color: '#fff',
-                        font: { weight: 'bold', size: 11 },
-                        formatter: (value, ctx) => {
-                            let sum = 0;
-                            let dataArr = ctx.chart.data.datasets[0].data;
-                            dataArr.map(data => { sum += data; });
-                            let percentage = (value * 100 / sum).toFixed(1) + "%";
-                            if((value * 100 / sum) < 3) return ""; 
-                            return percentage;
-                        }
+                if (isInvestItem) {
+                    if (cat.includes("現金") && !isDividend) return;
+                    if (!costMap[item]) costMap[item] = 0;
+                    if (type.includes("流入") || type.includes("買入")) {
+                        if (isDividend) totalDividends += Math.abs(amt);
+                        else { totalInvestCost += Math.abs(amt); costMap[item] += Math.abs(amt); }
+                    } else if (type.includes("流出") || type.includes("賣出")) {
+                        totalInvestCost -= Math.abs(amt); costMap[item] -= Math.abs(amt);
                     }
-                } 
-            } 
+                }
+            });
+
+            globalSnapshotData = []; 
+            let tableHtml = "";
+
+            // 2. 處理 Portfolio 資料
+            portfolioData.forEach((row, i) => {
+                // 🟢 關鍵修正：對應您的 Excel 標題
+                let itemName = row['項目名稱'];
+                let mv = Number(row['總市值'] || 0);
+                let qty = Number(row['持有數量'] || 0);
+                let priceNow = Number(row['即時單價'] || 0); 
+                // 如果沒填昨日收盤，就預設等於今日價 (視為沒漲跌)
+                let priceYest = Number(row['昨日收盤'] || row['即時單價'] || 0); 
+
+                let cost = costMap[itemName] || 0;
+                // 嘗試從 log 判斷類別，因為 Portfolio 可能沒這欄
+                let cat = ""; 
+                if(itemName.match(/00\d\d|Stock/)) cat = "股票";
+                else if(itemName.match(/BTC|ETH/)) cat = "加密貨幣";
+                else if(itemName.match(/黃金/)) cat = "黃金";
+
+                if (mv > 0) {
+                    currentMarketValue += mv;
+                    let isInvest = (cat.includes("股票") || itemName.match(/00\d\d|黃金|BTC|ETH|Stock/i));
+                    if (isInvest) investMarketValue += mv;
+
+                    labels.push(itemName); values.push(mv); colors.push(palette[i % palette.length]);
+                    
+                    // 單位顯示
+                    let unit = "單位";
+                    if(cat.includes("股票") || itemName.match(/00\d\d/)) unit = "股";
+                    if(cat.includes("加密") || itemName.includes("BTC")) unit = "顆";
+                    if(itemName.includes("黃金")) unit = "克";
+                    let qtyDisplay = (unit === "股") ? qty.toLocaleString() : qty;
+
+                    // 🟢 計算單日漲跌：(即時單價 - 昨日收盤) * 持有數量
+                    let dayChange = (priceNow - priceYest) * qty;
+                    
+                    // 台股風格：漲紅(▲) 跌綠(▼)
+                    let changeColor = dayChange > 0 ? "#ff4d4f" : (dayChange < 0 ? "#52c41a" : "#999");
+                    let changeSign = dayChange > 0 ? "▲ +" : (dayChange < 0 ? "▼ " : "");
+                    
+                    // 如果單價是 1 (例如銀行/現金)，通常不顯示漲跌
+                    let changeText = (dayChange !== 0 && Math.abs(priceNow - 1) > 0.01) ? 
+                        `<div style="color:${changeColor}; font-size:0.85em; margin-top:3px;">${changeSign}$${Math.abs(Math.round(dayChange)).toLocaleString()}</div>` : 
+                        `<div style="color:#ccc; font-size:0.8em; margin-top:3px;">-</div>`;
+
+                    tableHtml += `
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 12px 5px; font-weight:bold; color:#333;">
+                                <span style="display:inline-block; width:10px; height:10px; background:${palette[i % palette.length]}; margin-right:5px; border-radius:50%;"></span>
+                                ${itemName}
+                            </td>
+                            <td style="padding: 12px 5px; text-align: right; color:#555;">
+                                ${qtyDisplay} <span style="font-size:0.8em; color:#999;">${unit}</span>
+                            </td>
+                            <td style="padding: 12px 5px; text-align: right;">
+                                <div style="font-weight:bold;">$${mv.toLocaleString()}</div>
+                                ${changeText}
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                if (mv > 0 || cat.includes("股票")) {
+                    globalSnapshotData.push({ item: itemName, qty: qty, mv: mv, cost: cost });
+                }
+            });
+            
+            // 寫入表格
+            const tableBody = document.getElementById('holdingsTableBody');
+            if(tableBody) {
+                if(tableHtml === "") tableHtml = "<tr><td colspan='3' style='text-align:center; padding:20px; color:#ccc;'>目前沒有持股</td></tr>";
+                tableBody.innerHTML = tableHtml;
+            }
+
+            // 更新上方大數據
+            globalSnapshotData.push({ item: "總資產", qty: 1, mv: currentMarketValue, cost: totalInvestCost });
+            globalTotalAssets = currentMarketValue;
+            let percent = Math.min(100, Math.round((currentMarketValue / SAVING_GOAL) * 100));
+            document.getElementById('goalProgressBar').style.width = percent + "%";
+            document.getElementById('goalPercent').innerText = percent + "%";
+            document.getElementById('totalAssetsDisplay').innerText = "$" + currentMarketValue.toLocaleString();
+            document.getElementById('totalCostDisplay').innerText = "$" + totalInvestCost.toLocaleString();
+            
+            let profit = (investMarketValue - totalInvestCost) + totalDividends;
+            let roi = totalInvestCost > 0 ? (profit / totalInvestCost) * 100 : 0;
+            if (totalInvestCost <= 0 && investMarketValue > 0) roi = 999; 
+            
+            let pEl = document.getElementById('totalProfitDisplay');
+            pEl.innerText = (profit >= 0 ? "+" : "") + "$" + profit.toLocaleString();
+            pEl.style.color = profit >= 0 ? "#ff9999" : "#99ff99";
+            let rEl = document.getElementById('roiDisplay');
+            rEl.innerText = (roi === 999 ? "∞" : ((roi >= 0 ? "+" : "") + roi.toFixed(2))) + "%";
+            rEl.style.color = roi >= 0 ? "#ff9999" : "#99ff99";
+
+            const ctx = document.getElementById('assetPieChart');
+            if(assetChart) assetChart.destroy();
+            assetChart = new Chart(ctx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: values, backgroundColor: colors }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' }, datalabels: { display: true, color: '#fff', font: { weight: 'bold', size: 11 }, formatter: (value, ctx) => { let sum = 0; let dataArr = ctx.chart.data.datasets[0].data; dataArr.map(data => { sum += data; }); let percentage = (value * 100 / sum).toFixed(1) + "%"; if((value * 100 / sum) < 3) return ""; return percentage; } } } } });
         });
-    });
-}
+    }
 
     // --- 功能 5：送出日常記帳 ---
     function submitExpense() {
