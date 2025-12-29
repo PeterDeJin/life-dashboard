@@ -1150,6 +1150,78 @@ function loadAssetChart() {
         });
     }
 
+    // --- 補回的功能：送出倒數事件 ---
+    function submitEvent() {
+        // 1. 抓取按鈕 (因為 HTML 裡沒有 ID，這裡用 event.target)
+        const btn = event.target;
+        
+        // 2. 抓取輸入框的值
+        const titleVal = document.getElementById('evtTitle').value;
+        const dateVal = document.getElementById('evtDate').value;
+        const typeVal = document.getElementById('evtType').value;
+
+        // 3. 基本防呆
+        if (!titleVal || !dateVal) {
+            alert("請輸入事件名稱與日期");
+            return;
+        }
+
+        // 4. 按鈕鎖定，避免重複按
+        btn.innerText = "寫入中...";
+        btn.disabled = true;
+
+        // 5. 準備要傳給 GAS 的資料
+        const payload = {
+            tab: "Events_DB",   // 這是你倒數清單的 Sheet 名稱
+            title: titleVal,    // 對應到 Sheet 裡的標題欄位
+            date: dateVal,      // 對應到 Sheet 裡的日期欄位
+            type: typeVal       // 對應到 Sheet 裡的類型欄位 (fixed / yearly)
+        };
+
+        // 6. 發送請求
+        fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.text())
+        .then(data => {
+            if (data.includes("Success")) {
+                alert("🎉 倒數事件新增成功！");
+                
+                // 清空輸入框
+                document.getElementById('evtTitle').value = "";
+                
+                // 關閉輸入選單
+                toggleEventForm();
+                
+                // 重新載入倒數列表
+                loadTimeWidget();
+            } else {
+                alert("寫入失敗，請檢查後端日誌：" + data);
+            }
+            
+            // 解鎖按鈕
+            btn.innerText = "新增";
+            btn.disabled = false;
+        })
+        .catch(err => {
+            console.error(err);
+            alert("發生連線錯誤");
+            btn.innerText = "新增";
+            btn.disabled = false;
+        });
+    }
+
+    // 以及這個切換顯示表單的函式 (如果這也漏掉的話請一併補上)
+    function toggleEventForm() {
+        const f = document.getElementById('eventForm');
+        if (f.style.display === "none") {
+            f.style.display = "flex";
+        } else {
+            f.style.display = "none";
+        }
+    }
+    
     // --- 🟢 功能 16 (時區修正版)：倒數日 (強制本地時間，解決過期不消失) ---
     function loadTimeWidget() {
         const container = document.getElementById('timeContainer');
