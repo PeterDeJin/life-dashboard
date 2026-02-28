@@ -772,33 +772,211 @@
 //     });
 // }
 
-    // --- 功能 4 (修正版)：資產圓餅圖與列表 (含個別成本計算) ---
+//     // --- 功能 4 (修正版)：資產圓餅圖與列表 (含個別成本計算) ---
+// function loadAssetChart() {
+//     Promise.all([
+//         fetch(API_URL + "?tab=Portfolio").then(res => res.json()),
+//         fetch(API_URL + "?tab=Asset_Log").then(res => res.json())
+//     ]).then(([portfolioData, logData]) => {
+        
+//         // --- 變數初始化 ---
+//         let currentTotalAssets = 0; // 總資產 (含銀行/郵局)
+//         let investMarketValue = 0;  // 投資現值 (只含股票/幣)
+        
+//         // 1. 成本面
+//         let remainingCost = 0;      // 總剩餘成本
+//         let itemCostMap = {};       // 🟢 新增：用來記住「每一檔」股票的成本
+        
+//         let soldCost = 0;           // 已賣出股票的成本
+        
+//         // 2. 收入面
+//         let totalDividends = 0;     // 股利
+//         let sellIncome = 0;         // 賣股收到的現金
+        
+//         let categoryMap = {};       
+        
+//         // --- 步驟 1: 處理 Asset_Log (拆解 成本 與 收入) ---
+//         logData.forEach(row => {
+//             let account = (row['帳戶'] || "").toString();
+//             // 🟢 修正：加上去除逗號，確保數字正確
+//             let amount = Number(String(row['金額'] || 0).replace(/,/g, ''));
+//             let name = (row['項目名稱'] || "").toString();
+//             let cat = row['資產類別'];
+//             let type = row['交易型態']; 
+            
+//             if (name && cat) categoryMap[name] = cat;
+
+//             // --- A. 處理成本 (富邦證券) ---
+//             if (account === "富邦證券") {
+//                 // 1. 累加總成本
+//                 remainingCost += amount;
+                
+//                 // 🟢 新增：累加「個別」項目的成本 (為了給快照用)
+//                 if (!itemCostMap[name]) itemCostMap[name] = 0;
+//                 itemCostMap[name] += amount;
+
+//                 // 2. 統計已賣出的成本
+//                 if (amount < 0) {
+//                     soldCost += Math.abs(amount); 
+//                 }
+//             } 
+//             // --- B. 處理收入 ---
+//             else {
+//                 if (name.includes("股利")) {
+//                     totalDividends += amount;
+//                 }
+//                 let isInvestItem = name.match(/00|Stock|BTC|ETH|黃金|賣出/);
+//                 if (isInvestItem && type === "流入" && !name.includes("股利")) {
+//                     sellIncome += amount;
+//                 }
+//             }
+//         });
+
+//         // Debug
+//         console.log("剩餘總成本:", remainingCost);
+//         console.log("個別成本清單:", itemCostMap);
+
+//         // --- 步驟 2: 處理 Portfolio ---
+//         let labels = [], values = [], colors = [];
+//         const palette = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#E7E9ED', '#76D7C4', '#F1948A'];
+        
+//         globalSnapshotData = []; 
+//         let tableHtml = "";
+
+//         portfolioData.forEach((row, i) => {
+//             let itemName = (row['項目名稱'] || "").toString();
+//             // 🟢 修正：加上去除逗號
+//             let mv = Number(String(row['總市值'] || 0).replace(/,/g, ''));
+//             let qty = Number(String(row['持有數量'] || 0).replace(/,/g, ''));
+//             let priceNow = Number(String(row['即時單價'] || 0).replace(/,/g, '')); 
+//             let priceYest = Number(String(row['昨日收盤'] || row['即時單價'] || 0).replace(/,/g, '')); 
+            
+//             let isCashSavings = itemName.includes("郵局") || itemName.includes("富邦銀行") || itemName.includes("現金");
+
+//             if (mv > 0) {
+//                 currentTotalAssets += mv;
+                
+//                 if (!isCashSavings) {
+//                     investMarketValue += mv;
+//                 }
+
+//                 labels.push(itemName); 
+//                 values.push(mv); 
+//                 colors.push(palette[i % palette.length]);
+                
+//                 // 🟢 核心修改：這裡抓取我們剛剛算好的個別成本
+//                 let thisItemCost = itemCostMap[itemName] || 0;
+                
+//                 // 寫入快照資料 (cost 不再是 0 了！)
+//                 globalSnapshotData.push({ item: itemName, qty: qty, mv: mv, cost: thisItemCost });
+
+//                 let unit = "單位";
+//                 if (itemName.match(/00|Stock/)) unit = "股";
+//                 else if (itemName.match(/BTC|ETH/)) unit = "顆";
+//                 else if (itemName.match(/黃金/)) unit = "克";
+//                 let qtyDisplay = (unit === "股") ? qty.toLocaleString() : qty;
+
+//                 let dayChange = (priceNow - priceYest) * qty;
+//                 let changeColor = dayChange > 0 ? "#ff4d4f" : (dayChange < 0 ? "#52c41a" : "#999");
+//                 let changeSign = dayChange > 0 ? "▲ +" : (dayChange < 0 ? "▼ " : "");
+//                 let showChange = (dayChange !== 0 && Math.abs(priceNow - 1) > 0.01 && !isCashSavings);
+
+//                 let changeText = showChange ? 
+//                     `<div style="color:${changeColor}; font-size:0.85em; margin-top:3px;">${changeSign}$${Math.abs(Math.round(dayChange)).toLocaleString()}</div>` : 
+//                     `<div style="color:#ccc; font-size:0.8em; margin-top:3px;">-</div>`;
+
+//                 tableHtml += `
+//                     <tr style="border-bottom: 1px solid #eee;">
+//                         <td style="padding: 12px 5px; font-weight:bold; color:#333;">
+//                             <span style="display:inline-block; width:10px; height:10px; background:${palette[i % palette.length]}; margin-right:5px; border-radius:50%;"></span>
+//                             ${itemName}
+//                         </td>
+//                         <td style="padding: 12px 5px; text-align: right; color:#555;">${qtyDisplay} <span style="font-size:0.8em; color:#999;">${unit}</span></td>
+//                         <td style="padding: 12px 5px; text-align: right;">
+//                             <div style="font-weight:bold;">$${mv.toLocaleString()}</div>${changeText}
+//                         </td>
+//                     </tr>`;
+//             }
+//         });
+        
+//         // --- 步驟 3: 最終計算 ---
+//         const tableBody = document.getElementById('holdingsTableBody');
+//         if(tableBody) tableBody.innerHTML = tableHtml || "<tr><td colspan='3' style='text-align:center;'>無資產</td></tr>";
+
+//         globalTotalAssets = currentTotalAssets;
+//         document.getElementById('totalAssetsDisplay').innerText = "$" + currentTotalAssets.toLocaleString();
+        
+//         let percent = Math.min(100, Math.round((currentTotalAssets / SAVING_GOAL) * 100));
+//         document.getElementById('goalProgressBar').style.width = percent + "%";
+//         document.getElementById('goalPercent').innerText = percent + "%";
+        
+//         document.getElementById('totalCostDisplay').innerText = "$" + remainingCost.toLocaleString();
+        
+//         let unrealizedProfit = investMarketValue - remainingCost;
+//         let realizedTradingProfit = sellIncome - soldCost;
+//         let totalProfit = unrealizedProfit + realizedTradingProfit + totalDividends;
+        
+//         let roiBase = remainingCost > 0 ? remainingCost : 1; 
+//         let roi = (totalProfit / roiBase) * 100;
+        
+//         let pEl = document.getElementById('totalProfitDisplay');
+//         pEl.innerText = (totalProfit >= 0 ? "+" : "") + "$" + totalProfit.toLocaleString();
+//         pEl.style.color = totalProfit >= 0 ? "#ff9999" : "#99ff99";
+
+//         let rEl = document.getElementById('roiDisplay');
+//         rEl.innerText = (roi === 999 ? "∞" : ((roi >= 0 ? "+" : "") + roi.toFixed(2))) + "%";
+//         rEl.style.color = roi >= 0 ? "#ff9999" : "#99ff99";
+
+//         const ctx = document.getElementById('assetPieChart');
+//         if(assetChart) assetChart.destroy();
+//         assetChart = new Chart(ctx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: values, backgroundColor: colors }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' }, datalabels: { display: true, color: '#fff', font: { weight: 'bold', size: 11 }, formatter: (value, ctx) => { let sum = 0; let dataArr = ctx.chart.data.datasets[0].data; dataArr.map(data => { sum += data; }); let percentage = (value * 100 / sum).toFixed(1) + "%"; if((value * 100 / sum) < 3) return ""; return percentage; } } } } });
+//     });
+// }
+
+    // --- 功能 4 (解法 B：強制同步動態餘額版)：資產圓餅圖與列表 ---
 function loadAssetChart() {
+    // 🟢 核心修改 1：多抓一個 Expenses_DB (日常記帳資料)
     Promise.all([
         fetch(API_URL + "?tab=Portfolio").then(res => res.json()),
-        fetch(API_URL + "?tab=Asset_Log").then(res => res.json())
-    ]).then(([portfolioData, logData]) => {
+        fetch(API_URL + "?tab=Asset_Log").then(res => res.json()),
+        fetch(API_URL + "?tab=Expenses_DB").then(res => res.json()) 
+    ]).then(([portfolioData, logData, expData]) => {
         
+        // --- 🟢 核心修改 2：預先計算所有帳戶的「真實動態餘額」 ---
+        let dynamicBalances = {};
+        
+        // 1. 計算資產進出 (Asset_Log)
+        logData.forEach(r => { 
+            let acc = (r['帳戶'] || "").toString(); 
+            let amt = Number(String(r['金額'] || 0).replace(/,/g, ''));
+            if(acc) dynamicBalances[acc] = (dynamicBalances[acc] || 0) + amt; 
+        });
+        
+        // 2. 計算日常花費 (Expenses_DB)
+        expData.forEach(r => { 
+            let acc = (r['帳戶'] || "").toString(); 
+            let amt = Number(String(r['金額'] || 0).replace(/,/g, ''));
+            if(acc) { 
+                if(r['收支'] === "支出") dynamicBalances[acc] = (dynamicBalances[acc] || 0) - amt; 
+                else dynamicBalances[acc] = (dynamicBalances[acc] || 0) + amt; 
+            } 
+        });
+
         // --- 變數初始化 ---
-        let currentTotalAssets = 0; // 總資產 (含銀行/郵局)
-        let investMarketValue = 0;  // 投資現值 (只含股票/幣)
+        let currentTotalAssets = 0; 
+        let investMarketValue = 0;  
         
-        // 1. 成本面
-        let remainingCost = 0;      // 總剩餘成本
-        let itemCostMap = {};       // 🟢 新增：用來記住「每一檔」股票的成本
+        let remainingCost = 0;      
+        let itemCostMap = {};       
+        let soldCost = 0;           
         
-        let soldCost = 0;           // 已賣出股票的成本
-        
-        // 2. 收入面
-        let totalDividends = 0;     // 股利
-        let sellIncome = 0;         // 賣股收到的現金
-        
+        let totalDividends = 0;     
+        let sellIncome = 0;         
         let categoryMap = {};       
         
         // --- 步驟 1: 處理 Asset_Log (拆解 成本 與 收入) ---
         logData.forEach(row => {
             let account = (row['帳戶'] || "").toString();
-            // 🟢 修正：加上去除逗號，確保數字正確
             let amount = Number(String(row['金額'] || 0).replace(/,/g, ''));
             let name = (row['項目名稱'] || "").toString();
             let cat = row['資產類別'];
@@ -806,21 +984,15 @@ function loadAssetChart() {
             
             if (name && cat) categoryMap[name] = cat;
 
-            // --- A. 處理成本 (富邦證券) ---
             if (account === "富邦證券") {
-                // 1. 累加總成本
                 remainingCost += amount;
-                
-                // 🟢 新增：累加「個別」項目的成本 (為了給快照用)
                 if (!itemCostMap[name]) itemCostMap[name] = 0;
                 itemCostMap[name] += amount;
-
-                // 2. 統計已賣出的成本
+                
                 if (amount < 0) {
                     soldCost += Math.abs(amount); 
                 }
             } 
-            // --- B. 處理收入 ---
             else {
                 if (name.includes("股利")) {
                     totalDividends += amount;
@@ -832,10 +1004,6 @@ function loadAssetChart() {
             }
         });
 
-        // Debug
-        console.log("剩餘總成本:", remainingCost);
-        console.log("個別成本清單:", itemCostMap);
-
         // --- 步驟 2: 處理 Portfolio ---
         let labels = [], values = [], colors = [];
         const palette = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#E7E9ED', '#76D7C4', '#F1948A'];
@@ -845,13 +1013,22 @@ function loadAssetChart() {
 
         portfolioData.forEach((row, i) => {
             let itemName = (row['項目名稱'] || "").toString();
-            // 🟢 修正：加上去除逗號
-            let mv = Number(String(row['總市值'] || 0).replace(/,/g, ''));
+            let originalMv = Number(String(row['總市值'] || 0).replace(/,/g, ''));
             let qty = Number(String(row['持有數量'] || 0).replace(/,/g, ''));
             let priceNow = Number(String(row['即時單價'] || 0).replace(/,/g, '')); 
             let priceYest = Number(String(row['昨日收盤'] || row['即時單價'] || 0).replace(/,/g, '')); 
             
-            let isCashSavings = itemName.includes("郵局") || itemName.includes("富邦銀行") || itemName.includes("現金");
+            // 判斷是否為現金/存款帳戶 (包含錢包、銀行、郵局等)
+            let isCashSavings = itemName.includes("郵局") || itemName.includes("富邦銀行") || itemName.includes("現金") || itemName.includes("錢包") || itemName.includes("中國信託");
+
+            // 🟢 核心修改 3：如果是現金帳戶，強制使用動態算出的餘額！
+            let mv = originalMv;
+            if (isCashSavings) {
+                // 如果動態餘額裡有這個帳戶，就用動態餘額；沒有的話預設為 0
+                mv = dynamicBalances[itemName] !== undefined ? dynamicBalances[itemName] : 0;
+                // 同時更新數量，因為現金的數量就是它的金額本身
+                qty = mv; 
+            }
 
             if (mv > 0) {
                 currentTotalAssets += mv;
@@ -864,17 +1041,18 @@ function loadAssetChart() {
                 values.push(mv); 
                 colors.push(palette[i % palette.length]);
                 
-                // 🟢 核心修改：這裡抓取我們剛剛算好的個別成本
                 let thisItemCost = itemCostMap[itemName] || 0;
+                if(isCashSavings) thisItemCost = mv; // 避免現金影響未實現損益
                 
-                // 寫入快照資料 (cost 不再是 0 了！)
                 globalSnapshotData.push({ item: itemName, qty: qty, mv: mv, cost: thisItemCost });
 
                 let unit = "單位";
                 if (itemName.match(/00|Stock/)) unit = "股";
                 else if (itemName.match(/BTC|ETH/)) unit = "顆";
                 else if (itemName.match(/黃金/)) unit = "克";
-                let qtyDisplay = (unit === "股") ? qty.toLocaleString() : qty;
+                else if (isCashSavings) unit = "元"; // 🟢 現金單位優化顯示為「元」
+                
+                let qtyDisplay = (unit === "股") ? qty.toLocaleString() : qty.toLocaleString();
 
                 let dayChange = (priceNow - priceYest) * qty;
                 let changeColor = dayChange > 0 ? "#ff4d4f" : (dayChange < 0 ? "#52c41a" : "#999");
