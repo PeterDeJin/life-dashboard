@@ -279,6 +279,10 @@
                 <div class="roi-item" style="text-align: center;">
                     <div style="font-size: 0.9rem; opacity: 0.8;">ROI</div><div id="roiDisplay" style="font-size: 1.2rem; font-weight: bold; color: #4ade80;">0%</div>
                 </div>
+                <div class="roi-item" style="text-align: center;">
+                    <div style="font-size: 0.9rem; opacity: 0.8;">組合 Beta</div>
+                    <div id="portfolioBetaDisplay" style="font-size: 1.2rem; font-weight: bold; color: #fbc02d;">...</div>
+                </div>
             </div>
         </div>
 
@@ -1007,12 +1011,22 @@ function loadAssetChart() {
         // --- 步驟 2: 處理 Portfolio ---
         let labels = [], values = [], colors = [];
         const palette = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#E7E9ED', '#76D7C4', '#F1948A'];
+
+        let portfolioBeta = null;
         
         globalSnapshotData = []; 
         let tableHtml = "";
 
         portfolioData.forEach((row, i) => {
             let itemName = (row['項目名稱'] || "").toString();
+
+            if (itemName.toLowerCase().includes("beta")) {
+             // 假設你把 SUM 加總出來的 Beta 值，放在「總市值」那個欄位
+             let rawBeta = row['總市值'] || row['持有數量'] || row['即時單價']; 
+             portfolioBeta = Number(String(rawBeta || 0).replace(/,/g, ''));
+             return; // 關鍵！用 return 跳出這一次迴圈，它就不會出現在清單和圓餅圖了
+            }
+            
             let originalMv = Number(String(row['總市值'] || 0).replace(/,/g, ''));
             let qty = Number(String(row['持有數量'] || 0).replace(/,/g, ''));
             let priceNow = Number(String(row['即時單價'] || 0).replace(/,/g, '')); 
@@ -1104,6 +1118,21 @@ function loadAssetChart() {
         let rEl = document.getElementById('roiDisplay');
         rEl.innerText = (roi === 999 ? "∞" : ((roi >= 0 ? "+" : "") + roi.toFixed(2))) + "%";
         rEl.style.color = roi >= 0 ? "#ff9999" : "#99ff99";
+
+        let bEl = document.getElementById('portfolioBetaDisplay');
+        if (bEl) {
+             if (portfolioBeta !== null && portfolioBeta > 0) {
+                 bEl.innerText = portfolioBeta.toFixed(2);
+                 // 大於 1.1 偏紅(波動大)，小於 0.9 偏綠(抗跌)，其餘黃色
+                 if (portfolioBeta > 1.1) bEl.style.color = "#ff7675";
+                 else if (portfolioBeta < 0.9) bEl.style.color = "#55efc4";
+                 else bEl.style.color = "#fbc02d";
+             } else {
+                 bEl.innerText = "未設定";
+                 bEl.style.fontSize = "1rem";
+                 bEl.style.color = "#ccc";
+             }
+        }
 
         const ctx = document.getElementById('assetPieChart');
         if(assetChart) assetChart.destroy();
