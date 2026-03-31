@@ -1044,27 +1044,32 @@ function loadAssetChart() {
                 qty = mv; 
             }
 
-            if (mv > 0) {
-                currentTotalAssets += mv;
+            // 🟢 關鍵修正：只要不是 0 都算進去（包含負數）
+            if (mv !== 0) {
+                currentTotalAssets += mv; // 總資產直接加上去（負數就會自動扣除，算出真實淨值）
                 
                 if (!isCashSavings) {
                     investMarketValue += mv;
                 }
 
-                labels.push(itemName); 
-                values.push(mv); 
-                colors.push(palette[i % palette.length]);
+                // 🟢 圓餅圖「只能」畫正資產，所以只有大於 0 才推進 Chart 陣列
+                if (mv > 0) {
+                    labels.push(itemName); 
+                    values.push(mv); 
+                    colors.push(palette[i % palette.length]);
+                }
                 
                 let thisItemCost = itemCostMap[itemName] || 0;
-                if(isCashSavings) thisItemCost = mv; // 避免現金影響未實現損益
+                if(isCashSavings) thisItemCost = mv; 
                 
+                // 🟢 快照資料必須包含負債！這樣紀錄才會精準
                 globalSnapshotData.push({ item: itemName, qty: qty, mv: mv, cost: thisItemCost });
 
                 let unit = "單位";
                 if (itemName.match(/00|Stock/)) unit = "股";
                 else if (itemName.match(/BTC|ETH/)) unit = "顆";
                 else if (itemName.match(/黃金/)) unit = "克";
-                else if (isCashSavings) unit = "元"; // 🟢 現金單位優化顯示為「元」
+                else if (isCashSavings) unit = "元"; 
                 
                 let qtyDisplay = (unit === "股") ? qty.toLocaleString() : qty.toLocaleString();
 
@@ -1077,15 +1082,19 @@ function loadAssetChart() {
                     `<div style="color:${changeColor}; font-size:0.85em; margin-top:3px;">${changeSign}$${Math.abs(Math.round(dayChange)).toLocaleString()}</div>` : 
                     `<div style="color:#ccc; font-size:0.8em; margin-top:3px;">-</div>`;
 
+                // 🟢 在明細清單中，如果遇到負數，用紅色標示出來！
+                let rowColor = mv < 0 ? '#e91e63' : 'inherit';
+                let dotColor = mv > 0 ? palette[i % palette.length] : '#e91e63';
+
                 tableHtml += `
                     <tr style="border-bottom: 1px solid #eee;">
                         <td style="padding: 12px 5px; font-weight:bold; color:#333;">
-                            <span style="display:inline-block; width:10px; height:10px; background:${palette[i % palette.length]}; margin-right:5px; border-radius:50%;"></span>
+                            <span style="display:inline-block; width:10px; height:10px; background:${dotColor}; margin-right:5px; border-radius:50%;"></span>
                             ${itemName}
                         </td>
                         <td style="padding: 12px 5px; text-align: right; color:#555;">${qtyDisplay} <span style="font-size:0.8em; color:#999;">${unit}</span></td>
                         <td style="padding: 12px 5px; text-align: right;">
-                            <div style="font-weight:bold;">$${mv.toLocaleString()}</div>${changeText}
+                            <div style="font-weight:bold; color:${rowColor};">$${mv.toLocaleString()}</div>${changeText}
                         </td>
                     </tr>`;
             }
