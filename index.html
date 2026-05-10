@@ -480,16 +480,26 @@ function loadAssetChart() {
         logData.forEach(r => { let a=(r['帳戶']||"").toString(); if(a) dyn[a]=(dyn[a]||0)+n(r['金額']); });
         expData.forEach(r => { let a=(r['帳戶']||"").toString(), amt=n(r['金額']); if(a) dyn[a]=(dyn[a]||0)+(r['收支']==="支出"?-amt:amt); });
 
-        let totalAssets=0, investMV=0, remainCost=0, itemCostMap={}, soldCost=0, divs=0, sellInc=0;
+        // 記帳邏輯：
+        // 買股：富邦銀行 買XXXX(-), 富邦證券 XXXX(+成本)
+        // 賣股：富邦銀行 賣XXXX(+實收), 富邦證券 XXXX(-成本，非賣出金額)
+        // 當沖：富邦銀行 買賣XXXX(淨損益，不進富邦證券)
+        let totalAssets=0, investMV=0, totalBuyCost=0, itemCostMap={}, positionProceeds=0, tradeNetPnL=0, divs=0;
         logData.forEach(row => {
-            let acc=(row['帳戶']||"").toString(), amt=n(row['金額']), name=(row['項目名稱']||"").toString(), type=row['交易型態'];
+            let acc=(row['帳戶']||"").toString(), amt=n(row['金額']), name=(row['項目名稱']||"").toString();
             if (acc==="富邦證券") {
-                remainCost+=amt;
-                itemCostMap[name]=(itemCostMap[name]||0)+amt;
-                if(amt<0) soldCost+=Math.abs(amt);
+                if (amt > 0) {
+                    totalBuyCost += amt;
+                    itemCostMap[name] = (itemCostMap[name]||0) + amt;
+                } else {
+                    itemCostMap[name] = (itemCostMap[name]||0) + amt; // 扣掉已賣出成本
+                }
+            } else if (acc==="富邦銀行") {
+                if (name.match(/^賣/) && !name.startsWith("買賣")) positionProceeds += amt > 0 ? amt : 0;
+                else if (name.startsWith("買賣")) tradeNetPnL += amt;
+                if (name.includes("股利")||name.includes("股息")) divs += Math.max(0, amt);
             } else {
-                if(name.includes("股利")) divs+=amt;
-                if(name.match(/00|Stock|BTC|ETH|黃金|賣出/)&&type==="流入"&&!name.includes("股利")) sellInc+=amt;
+                if (name.includes("股利")||name.includes("股息")) divs += Math.max(0, amt);
             }
         });
 
@@ -526,8 +536,8 @@ function loadAssetChart() {
         let pct=Math.min(100,Math.round((totalAssets/SAVING_GOAL)*100));
         document.getElementById('goalProgressBar').style.width=pct+"%";
         document.getElementById('goalPercent').innerText=pct+"%";
-        document.getElementById('totalCostDisplay').innerText="$"+remainCost.toLocaleString();
-        let profit=(investMV-remainCost)+(sellInc-soldCost)+divs, roi=remainCost>0?(profit/remainCost)*100:0;
+        document.getElementById('totalCostDisplay').innerText="$"+totalBuyCost.toLocaleString();
+        let profit=(investMV+positionProceeds+tradeNetPnL+divs)-totalBuyCost, roi=totalBuyCost>0?(profit/totalBuyCost)*100:0;
         let pEl=document.getElementById('totalProfitDisplay');
         pEl.innerText=(profit>=0?"+":"")+"$"+Math.round(profit).toLocaleString(); pEl.style.color=profit>=0?"#ff9999":"#99ff99";
         let rEl=document.getElementById('roiDisplay');
@@ -611,12 +621,13 @@ function loadExpenseComparison() {
             else if(rKey===lmKey){lm[c]+=amt;lm.total+=amt;}
         });
 
-        // 本月收入（用於儲蓄率）
+        // 本月收入（用於儲蓄率），排除股票賣出收款（資本返還，非真實收入）
         let monthIncome=0;
         logData.forEach(row=>{
             let amt=n(row.金額); if(amt<=0) return;
             let acc=row.帳戶||"", name=(row['項目名稱']||row['項目']||"").toString();
             if(!acc.includes("郵局")&&!acc.includes("銀行")&&!acc.includes("現金")) return;
+            if(name.match(/^賣/)) return;  // 排除「賣2454」等股票賣出收款
             if(name.match(/賣出|存錢|轉入|領錢|換匯/)) return;
             let d=new Date(row.日期); if(isNaN(d.getTime())) return;
             if(`${d.getFullYear()}/${d.getMonth()+1}`===cmKey) monthIncome+=amt;
