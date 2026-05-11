@@ -255,15 +255,16 @@
             <h2>📈 股票交易</h2>
             <div class="asset-form">
                 <label>日期：<input type="date" id="stDate"></label>
-                <label>股票代號：<input type="text" id="stCode" placeholder="如：2454、006208" oninput="scheduleStockPreview()"></label>
+                <label>股票代號：<input type="text" id="stCode" placeholder="如：2454、006208" oninput="scheduleStockPreview(true)"></label>
                 <label>交易：
-                    <select id="stAction" onchange="updateStockPreview()" style="width:55%;">
+                    <select id="stAction" onchange="updateStockPreview(true)" style="width:55%;">
                         <option value="buy">買入 ▲</option>
                         <option value="sell">賣出 ▼</option>
                     </select>
                 </label>
-                <label>股數：<input type="number" id="stShares" placeholder="股數" oninput="updateStockPreview()"></label>
-                <label>成交單價：<input type="number" id="stPrice" placeholder="元/股" oninput="updateStockPreview()"></label>
+                <label>股數：<input type="number" id="stShares" placeholder="股數" oninput="updateStockPreview(true)"></label>
+                <label>成交單價：<input type="number" id="stPrice" placeholder="元/股" oninput="updateStockPreview(true)"></label>
+                <label id="stFeeLabel">手續費：<input type="number" id="stFee" placeholder="自動計算" oninput="updateStockPreview(false)" style="width:55%;"></label>
                 <div id="stPreview" style="display:none;background:#f8f9fa;padding:15px;border-radius:10px;line-height:2;font-size:0.95em;"></div>
                 <button onclick="submitStockTrade()" id="btnStTrade" style="background:#fbc02d;color:#333;width:100%;font-size:1rem;">確認交易</button>
             </div>
@@ -497,36 +498,59 @@ function toggleAdvancedAsset() {
     f.style.display = f.style.display === 'none' ? 'block' : 'none';
 }
 
+// 手續費自動計算（標準 0.1425%，最低 $20）
+function calcBrokerage(total) { return Math.max(20, Math.ceil(total * 0.001425)); }
+function calcTax(total)       { return Math.round(total * 0.003); } // 證交稅 0.3%（賣出才有）
+
 let _stPreviewTimer = null;
-function scheduleStockPreview() {
+function scheduleStockPreview(recalcFee = true) {
     clearTimeout(_stPreviewTimer);
-    _stPreviewTimer = setTimeout(updateStockPreview, 400);
+    _stPreviewTimer = setTimeout(() => updateStockPreview(recalcFee), 400);
 }
 
-async function updateStockPreview() {
+async function updateStockPreview(recalcFee = true) {
     const code    = (document.getElementById('stCode').value || '').trim();
     const action  = document.getElementById('stAction').value;
     const shares  = n(document.getElementById('stShares').value);
     const price   = n(document.getElementById('stPrice').value);
+    const feeEl   = document.getElementById('stFee');
     const preview = document.getElementById('stPreview');
+    const feeLabel = document.getElementById('stFeeLabel');
 
     if (!code || !shares || !price) { preview.style.display = 'none'; return; }
 
     const total = Math.round(shares * price);
+
+    // 自動帶入手續費（僅在 recalcFee = true 時覆寫，避免蓋掉使用者手動輸入）
+    if (recalcFee) {
+        if (action === 'buy') {
+            feeEl.value = calcBrokerage(total);
+            feeLabel.childNodes[0].textContent = '手續費：';
+        } else {
+            feeEl.value = calcBrokerage(total) + calcTax(total);
+            feeLabel.childNodes[0].textContent = '手續費＋證交稅：';
+        }
+    } else {
+        // 僅更新 label 文字
+        feeLabel.childNodes[0].textContent = action === 'buy' ? '手續費：' : '手續費＋證交稅：';
+    }
+
+    const fee = n(feeEl.value) || 0;
     preview.style.display = 'block';
 
     if (action === 'buy') {
+        const totalPaid = total + fee;
         preview._costBasis = null;
         preview.innerHTML = `
             <div style="color:#888;font-size:0.85em;margin-bottom:6px;">📋 將自動寫入兩筆：</div>
-            <div>🏦 富邦銀行 扣款：<b style="color:#e91e63;">－$${total.toLocaleString()}</b></div>
-            <div>📈 富邦證券 成本：<b style="color:#4caf50;">＋$${total.toLocaleString()}</b>（${shares} 股）</div>
-            <div style="color:#888;font-size:0.85em;margin-top:6px;">均價 $${(total/shares).toFixed(1)}/股</div>`;
+            <div>🏦 富邦銀行 扣款：<b style="color:#e91e63;">－$${totalPaid.toLocaleString()}</b> <span style="color:#bbb;font-size:0.85em;">（含手續費 $${fee.toLocaleString()}）</span></div>
+            <div>📈 富邦證券 成本：<b style="color:#4caf50;">＋$${totalPaid.toLocaleString()}</b>（${shares} 股）</div>
+            <div style="color:#888;font-size:0.85em;margin-top:6px;">含費均價 $${(totalPaid / shares).toFixed(1)}/股</div>`;
     } else {
         preview.innerHTML = `<div style="color:#aaa;font-size:0.9em;">⏳ 查詢持倉成本中...</div>`;
         const logData = await fetchTab('Asset_Log');
 
-        // 用加權平均成本法計算現有持倉的每股均價
+        // 加權平均成本法
         let remCost = 0, remShares = 0;
         logData.forEach(row => {
             if ((row['帳戶']||'').toString() === '富邦證券' &&
@@ -536,40 +560,41 @@ async function updateStockPreview() {
             }
         });
 
-        const avgCost   = remShares > 0 ? remCost / remShares : 0;
-        const costBasis = Math.round(avgCost * shares);
-        const proceeds  = total;
-        const pnl       = proceeds - costBasis;
-        const pnlColor  = pnl >= 0 ? '#4caf50' : '#e91e63';
-        const pnlSign   = pnl >= 0 ? '＋' : '－';
-        const pnlAbs    = Math.abs(pnl);
-
         if (remShares <= 0) {
             preview.innerHTML = `<div style="color:#e91e63;">⚠️ 找不到「${code}」的持倉記錄，請確認代號是否正確。</div>`;
             preview._costBasis = null;
             return;
         }
 
-        preview._costBasis  = costBasis;
-        preview._remShares  = remShares;
+        const avgCost    = remCost / remShares;
+        const costBasis  = Math.round(avgCost * shares);
+        const netProceeds = total - fee;
+        const pnl        = netProceeds - costBasis;
+        const pnlColor   = pnl >= 0 ? '#4caf50' : '#e91e63';
+        const pnlSign    = pnl >= 0 ? '＋' : '－';
+
+        preview._costBasis   = costBasis;
+        preview._netProceeds = netProceeds;
+        preview._remShares   = remShares;
         preview.innerHTML = `
             <div style="color:#888;font-size:0.85em;margin-bottom:6px;">📋 將自動寫入兩筆：</div>
-            <div>🏦 富邦銀行 入帳：<b style="color:#4caf50;">＋$${proceeds.toLocaleString()}</b></div>
+            <div>🏦 富邦銀行 入帳：<b style="color:#4caf50;">＋$${netProceeds.toLocaleString()}</b> <span style="color:#bbb;font-size:0.85em;">（扣手續費＋稅 $${fee.toLocaleString()}）</span></div>
             <div>📉 富邦證券 扣成本：<b style="color:#e91e63;">－$${costBasis.toLocaleString()}</b>（${shares} 股）</div>
-            <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e0e0e0;display:flex;justify-content:space-between;">
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e0e0e0;display:flex;justify-content:space-between;align-items:center;">
                 <span style="color:#888;font-size:0.85em;">均攤成本 $${Math.round(avgCost).toLocaleString()}/股，剩餘 ${remShares} 股</span>
-                <b style="color:${pnlColor};">損益 ${pnlSign}$${pnlAbs.toLocaleString()}</b>
+                <b style="color:${pnlColor};">損益 ${pnlSign}$${Math.abs(pnl).toLocaleString()}</b>
             </div>`;
     }
 }
 
 async function submitStockTrade() {
-    const btn    = document.getElementById('btnStTrade');
-    const date   = document.getElementById('stDate').value || new Date().toISOString().split('T')[0];
-    const code   = (document.getElementById('stCode').value || '').trim();
-    const action = document.getElementById('stAction').value;
-    const shares = n(document.getElementById('stShares').value);
-    const price  = n(document.getElementById('stPrice').value);
+    const btn     = document.getElementById('btnStTrade');
+    const date    = document.getElementById('stDate').value || new Date().toISOString().split('T')[0];
+    const code    = (document.getElementById('stCode').value || '').trim();
+    const action  = document.getElementById('stAction').value;
+    const shares  = n(document.getElementById('stShares').value);
+    const price   = n(document.getElementById('stPrice').value);
+    const fee     = n(document.getElementById('stFee').value) || 0;
     const preview = document.getElementById('stPreview');
 
     if (!code || !shares || !price) { alert('請填寫股票代號、股數和成交單價'); return; }
@@ -578,32 +603,35 @@ async function submitStockTrade() {
     let p1, p2;
 
     if (action === 'buy') {
-        p1 = { tab:'Asset_Log', date, account:'富邦銀行', category:'現金', item:`買${code}`, qty:'', amount:-total, type:'流出' };
-        p2 = { tab:'Asset_Log', date, account:'富邦證券', category:'股票', item:code, qty:shares, amount:total, type:'流入' };
+        const totalPaid = total + fee;
+        p1 = { tab:'Asset_Log', date, account:'富邦銀行', category:'現金', item:`買${code}`, qty:'', amount:-totalPaid, type:'流出' };
+        p2 = { tab:'Asset_Log', date, account:'富邦證券', category:'股票', item:code, qty:shares, amount:totalPaid, type:'流入' };
     } else {
-        const costBasis = preview._costBasis;
+        const costBasis   = preview._costBasis;
+        const netProceeds = preview._netProceeds;
         if (costBasis === null || costBasis === undefined) {
             alert('⚠️ 尚未取得成本資料，請稍等預覽載入完成後再確認');
             return;
         }
-        const pnl = total - costBasis;
+        const pnl = netProceeds - costBasis;
         const pnlText = (pnl >= 0 ? '獲利 ＋' : '虧損 ') + '$' + Math.abs(pnl).toLocaleString();
-        if (!confirm(`確認賣出 ${code}？\n\n賣出收款：$${total.toLocaleString()}\n扣除成本：$${costBasis.toLocaleString()}\n本次${pnlText}`)) return;
-        p1 = { tab:'Asset_Log', date, account:'富邦銀行', category:'現金', item:`賣${code}`, qty:'', amount:total, type:'流入' };
+        if (!confirm(`確認賣出 ${code}？\n\n賣出收款：$${netProceeds.toLocaleString()}（含稅費 $${fee.toLocaleString()}）\n扣除成本：$${costBasis.toLocaleString()}\n本次${pnlText}`)) return;
+        p1 = { tab:'Asset_Log', date, account:'富邦銀行', category:'現金', item:`賣${code}`, qty:'', amount:netProceeds, type:'流入' };
         p2 = { tab:'Asset_Log', date, account:'富邦證券', category:'股票', item:code, qty:-shares, amount:-costBasis, type:'流出' };
     }
 
     btn.disabled = true; btn.innerText = '寫入中...';
     try {
         const [r1, r2] = await Promise.all([
-            fetch(API_URL, { method:'POST', body:JSON.stringify(p1) }).then(r=>r.text()),
-            fetch(API_URL, { method:'POST', body:JSON.stringify(p2) }).then(r=>r.text())
+            fetch(API_URL, { method:'POST', body:JSON.stringify(p1) }).then(r => r.text()),
+            fetch(API_URL, { method:'POST', body:JSON.stringify(p2) }).then(r => r.text())
         ]);
         if (r1.includes('Success') && r2.includes('Success')) {
-            alert(action === 'buy' ? `✅ 買入成功！共花費 $${total.toLocaleString()}` : `✅ 賣出成功！`);
-            document.getElementById('stShares').value = '';
-            document.getElementById('stPrice').value  = '';
-            document.getElementById('stCode').value   = '';
+            const totalPaid = total + (action === 'buy' ? fee : 0);
+            alert(action === 'buy'
+                ? `✅ 買入成功！\n共花費 $${(total + fee).toLocaleString()}（含手續費 $${fee.toLocaleString()}）`
+                : `✅ 賣出成功！`);
+            ['stShares','stPrice','stCode','stFee'].forEach(id => document.getElementById(id).value = '');
             preview.style.display = 'none';
             invalidateCache('Asset_Log');
             loadAssetChart(); loadAccountBalances();
