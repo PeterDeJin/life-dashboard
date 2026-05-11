@@ -252,16 +252,35 @@
         </div>
 
         <div class="card full-width" style="border-left:5px solid #fbc02d;">
-            <h2>✍️ 股票/大額交易</h2>
+            <h2>📈 股票交易</h2>
             <div class="asset-form">
-                <label>日期：<input type="date" id="assetDate"></label>
-                <label>帳戶：<select id="assetAccount"><option value="富邦證券">富邦證券</option><option value="郵局">郵局</option><option value="富邦銀行">富邦銀行</option></select></label>
-                <label>類別：<select id="assetCategory"><option value="股票">股票</option><option value="現金">現金</option><option value="加密貨幣">加密貨幣</option></select></label>
-                <label>項目：<input type="text" id="assetItem" placeholder="0050"></label>
-                <label>數量：<input type="number" id="assetQty" placeholder="股數"></label>
-                <label>金額：<input type="number" id="assetAmount" placeholder="總價"></label>
-                <label>型態：<select id="assetType"><option value="流入">買入 (+)</option><option value="流出">賣出 (-)</option></select></label>
-                <button onclick="submitAsset()" id="btnAsset" style="background:#fbc02d;color:black;width:100%;">新增紀錄</button>
+                <label>日期：<input type="date" id="stDate"></label>
+                <label>股票代號：<input type="text" id="stCode" placeholder="如：2454、006208" oninput="scheduleStockPreview()"></label>
+                <label>交易：
+                    <select id="stAction" onchange="updateStockPreview()" style="width:55%;">
+                        <option value="buy">買入 ▲</option>
+                        <option value="sell">賣出 ▼</option>
+                    </select>
+                </label>
+                <label>股數：<input type="number" id="stShares" placeholder="股數" oninput="updateStockPreview()"></label>
+                <label>成交單價：<input type="number" id="stPrice" placeholder="元/股" oninput="updateStockPreview()"></label>
+                <div id="stPreview" style="display:none;background:#f8f9fa;padding:15px;border-radius:10px;line-height:2;font-size:0.95em;"></div>
+                <button onclick="submitStockTrade()" id="btnStTrade" style="background:#fbc02d;color:#333;width:100%;font-size:1rem;">確認交易</button>
+            </div>
+            <div style="margin-top:15px;padding-top:15px;border-top:1px solid #f0f0f0;">
+                <button onclick="toggleAdvancedAsset()" style="background:none;color:#aaa;font-size:0.8rem;padding:4px 10px;box-shadow:none;border:1px solid #eee;border-radius:20px;">⚙️ 其他手動記錄（現金調整 / 加密貨幣...）</button>
+                <div id="advancedAssetForm" style="display:none;margin-top:15px;">
+                    <div class="asset-form">
+                        <label>日期：<input type="date" id="assetDate"></label>
+                        <label>帳戶：<select id="assetAccount"><option value="富邦證券">富邦證券</option><option value="郵局">郵局</option><option value="富邦銀行">富邦銀行</option></select></label>
+                        <label>類別：<select id="assetCategory"><option value="股票">股票</option><option value="現金">現金</option><option value="加密貨幣">加密貨幣</option></select></label>
+                        <label>項目：<input type="text" id="assetItem" placeholder="0050"></label>
+                        <label>數量：<input type="number" id="assetQty" placeholder="股數"></label>
+                        <label>金額：<input type="number" id="assetAmount" placeholder="總價"></label>
+                        <label>型態：<select id="assetType"><option value="流入">流入 (+)</option><option value="流出">流出 (-)</option></select></label>
+                        <button onclick="submitAsset()" id="btnAsset" style="background:#607d8b;color:white;width:100%;">新增單筆記錄</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -397,7 +416,7 @@ function switchTab(tabId, navEl) {
 // ==========================================
 window.onload = async function() {
     const today = new Date().toISOString().split('T')[0];
-    ['habitDate','assetDate','expDate','transDate','mediaDate','evtDate'].forEach(id => {
+    ['habitDate','assetDate','stDate','expDate','transDate','mediaDate','evtDate'].forEach(id => {
         let el = document.getElementById(id); if (el) el.value = today;
     });
 
@@ -470,6 +489,132 @@ function submitAsset() {
             invalidateCache('Asset_Log'); loadAssetChart(); loadMonthlyIncome(); loadAccountBalances();
         } else { alert("失敗："+data); btn.disabled=false; }
     });
+}
+
+// 功能 3b：智慧股票交易（自動計算成本，一次寫入兩筆）
+function toggleAdvancedAsset() {
+    const f = document.getElementById('advancedAssetForm');
+    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+let _stPreviewTimer = null;
+function scheduleStockPreview() {
+    clearTimeout(_stPreviewTimer);
+    _stPreviewTimer = setTimeout(updateStockPreview, 400);
+}
+
+async function updateStockPreview() {
+    const code    = (document.getElementById('stCode').value || '').trim();
+    const action  = document.getElementById('stAction').value;
+    const shares  = n(document.getElementById('stShares').value);
+    const price   = n(document.getElementById('stPrice').value);
+    const preview = document.getElementById('stPreview');
+
+    if (!code || !shares || !price) { preview.style.display = 'none'; return; }
+
+    const total = Math.round(shares * price);
+    preview.style.display = 'block';
+
+    if (action === 'buy') {
+        preview._costBasis = null;
+        preview.innerHTML = `
+            <div style="color:#888;font-size:0.85em;margin-bottom:6px;">📋 將自動寫入兩筆：</div>
+            <div>🏦 富邦銀行 扣款：<b style="color:#e91e63;">－$${total.toLocaleString()}</b></div>
+            <div>📈 富邦證券 成本：<b style="color:#4caf50;">＋$${total.toLocaleString()}</b>（${shares} 股）</div>
+            <div style="color:#888;font-size:0.85em;margin-top:6px;">均價 $${(total/shares).toFixed(1)}/股</div>`;
+    } else {
+        preview.innerHTML = `<div style="color:#aaa;font-size:0.9em;">⏳ 查詢持倉成本中...</div>`;
+        const logData = await fetchTab('Asset_Log');
+
+        // 用加權平均成本法計算現有持倉的每股均價
+        let remCost = 0, remShares = 0;
+        logData.forEach(row => {
+            if ((row['帳戶']||'').toString() === '富邦證券' &&
+                (row['項目名稱']||'').toString() === code) {
+                remCost   += n(row['金額']);
+                remShares += n(row['數量']);
+            }
+        });
+
+        const avgCost   = remShares > 0 ? remCost / remShares : 0;
+        const costBasis = Math.round(avgCost * shares);
+        const proceeds  = total;
+        const pnl       = proceeds - costBasis;
+        const pnlColor  = pnl >= 0 ? '#4caf50' : '#e91e63';
+        const pnlSign   = pnl >= 0 ? '＋' : '－';
+        const pnlAbs    = Math.abs(pnl);
+
+        if (remShares <= 0) {
+            preview.innerHTML = `<div style="color:#e91e63;">⚠️ 找不到「${code}」的持倉記錄，請確認代號是否正確。</div>`;
+            preview._costBasis = null;
+            return;
+        }
+
+        preview._costBasis  = costBasis;
+        preview._remShares  = remShares;
+        preview.innerHTML = `
+            <div style="color:#888;font-size:0.85em;margin-bottom:6px;">📋 將自動寫入兩筆：</div>
+            <div>🏦 富邦銀行 入帳：<b style="color:#4caf50;">＋$${proceeds.toLocaleString()}</b></div>
+            <div>📉 富邦證券 扣成本：<b style="color:#e91e63;">－$${costBasis.toLocaleString()}</b>（${shares} 股）</div>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e0e0e0;display:flex;justify-content:space-between;">
+                <span style="color:#888;font-size:0.85em;">均攤成本 $${Math.round(avgCost).toLocaleString()}/股，剩餘 ${remShares} 股</span>
+                <b style="color:${pnlColor};">損益 ${pnlSign}$${pnlAbs.toLocaleString()}</b>
+            </div>`;
+    }
+}
+
+async function submitStockTrade() {
+    const btn    = document.getElementById('btnStTrade');
+    const date   = document.getElementById('stDate').value || new Date().toISOString().split('T')[0];
+    const code   = (document.getElementById('stCode').value || '').trim();
+    const action = document.getElementById('stAction').value;
+    const shares = n(document.getElementById('stShares').value);
+    const price  = n(document.getElementById('stPrice').value);
+    const preview = document.getElementById('stPreview');
+
+    if (!code || !shares || !price) { alert('請填寫股票代號、股數和成交單價'); return; }
+
+    const total = Math.round(shares * price);
+    let p1, p2;
+
+    if (action === 'buy') {
+        p1 = { tab:'Asset_Log', date, account:'富邦銀行', category:'現金', item:`買${code}`, qty:'', amount:-total, type:'流出' };
+        p2 = { tab:'Asset_Log', date, account:'富邦證券', category:'股票', item:code, qty:shares, amount:total, type:'流入' };
+    } else {
+        const costBasis = preview._costBasis;
+        if (costBasis === null || costBasis === undefined) {
+            alert('⚠️ 尚未取得成本資料，請稍等預覽載入完成後再確認');
+            return;
+        }
+        const pnl = total - costBasis;
+        const pnlText = (pnl >= 0 ? '獲利 ＋' : '虧損 ') + '$' + Math.abs(pnl).toLocaleString();
+        if (!confirm(`確認賣出 ${code}？\n\n賣出收款：$${total.toLocaleString()}\n扣除成本：$${costBasis.toLocaleString()}\n本次${pnlText}`)) return;
+        p1 = { tab:'Asset_Log', date, account:'富邦銀行', category:'現金', item:`賣${code}`, qty:'', amount:total, type:'流入' };
+        p2 = { tab:'Asset_Log', date, account:'富邦證券', category:'股票', item:code, qty:-shares, amount:-costBasis, type:'流出' };
+    }
+
+    btn.disabled = true; btn.innerText = '寫入中...';
+    try {
+        const [r1, r2] = await Promise.all([
+            fetch(API_URL, { method:'POST', body:JSON.stringify(p1) }).then(r=>r.text()),
+            fetch(API_URL, { method:'POST', body:JSON.stringify(p2) }).then(r=>r.text())
+        ]);
+        if (r1.includes('Success') && r2.includes('Success')) {
+            alert(action === 'buy' ? `✅ 買入成功！共花費 $${total.toLocaleString()}` : `✅ 賣出成功！`);
+            document.getElementById('stShares').value = '';
+            document.getElementById('stPrice').value  = '';
+            document.getElementById('stCode').value   = '';
+            preview.style.display = 'none';
+            invalidateCache('Asset_Log');
+            loadAssetChart(); loadAccountBalances();
+        } else {
+            alert('部分寫入失敗，請檢查後重試：\n' + r1 + '\n' + r2);
+        }
+    } catch(e) {
+        alert('連線錯誤，請重試');
+    } finally {
+        btn.disabled = false; btn.innerText = '確認交易';
+    }
 }
 
 // 功能 4：資產圖
