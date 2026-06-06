@@ -1,0 +1,8 @@
+# 機密：含密碼與 GAS 網址，絕不上傳
+config.js
+
+# macOS
+.DS_Store
+
+# 本機備份
+*.bak_*
