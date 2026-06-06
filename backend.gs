@@ -6,11 +6,11 @@
 // =========================================================
 var SCHEMAS = {
   Habit_Log:   [['date',['日期']],['english',['英文']],['exercise',['運動習慣','運動']],['reading',['讀書習慣','讀書']],['sleeping',['睡覺習慣','睡覺']]],
-  Asset_Log:   [['date',['日期']],['account',['帳戶']],['category',['類別','資產類別']],['item',['項目','項目名稱']],['qty',['數量','持有數量']],['amount',['金額']],['type',['型態']]],
+  Asset_Log:   [['date',['日期']],['account',['帳戶']],['category',['資產類別','類別']],['item',['項目名稱','項目']],['qty',['數量','持有數量']],['amount',['金額']],['type',['交易型態','型態']]],
   Expenses_DB: [['date',['日期']],['category',['類別']],['item',['項目','項目名稱']],['amount',['金額']],['account',['帳戶']],['type',['收支']]],
   Media_Log:   [['date',['日期']],['type',['類別']],['title',['標題']],['rating',['評分']],['comment',['心得']]],
   Events_DB:   [['title',['事件名稱']],['date',['日期']],['type',['類型']]],
-  Wishlist_DB: [['date',['日期']],['item',['項目','項目名稱']],['amount',['金額','預估金額']],['note',['連結','備註']]]
+  Wishlist_DB: [['date',['日期']],['item',['項目名稱','項目']],['amount',['預估金額','金額']],['note',['連結/備註','連結','備註']]]
 };
 
 function out(s)     { return ContentService.createTextOutput(s); }
