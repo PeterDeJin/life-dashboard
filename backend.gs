@@ -164,3 +164,51 @@ function doPost(e) {
     lock.releaseLock();
   }
 }
+
+// =========================================================
+// 自訂函數：黃金存摺價格（台灣銀行牌價，新台幣 / 公克）
+// 試算表用法：=GOLD_NOW() 取現價、=GOLD_PREV() 取前一營業日價
+// 取「本行買進」價＝你賣出黃金可拿到的價（＝持有黃金的可變現價值）
+// 若想改用「本行賣出」價，把下面的 .buy 改成 .sell 即可
+// =========================================================
+var _GOLD_DAY = 'https://rate.bot.com.tw/gold/chart/day/TWD';   // 當日盤中
+var _GOLD_LTM = 'https://rate.bot.com.tw/gold/chart/ltm/TWD';   // 近期每日
+
+function _goldFetch(url) {
+  return UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true }).getContentText();
+}
+
+// 解析頁面中的「買進,賣出」配對，依原順序回傳 [{buy, sell}, ...]
+function _goldPairs(html) {
+  var re = /<td class="text-right">\s*([\d,.]+)\s*<\/td>\s*<td class="text-right">\s*([\d,.]+)\s*<\/td>/g;
+  var arr = [], m;
+  while ((m = re.exec(html)) !== null) {
+    arr.push({ buy: Number(m[1].replace(/,/g, '')), sell: Number(m[2].replace(/,/g, '')) });
+  }
+  return arr;
+}
+
+// 現價：當日盤中最後一筆（最新時間）的「本行買進」；當日無資料則用每日表最新一筆
+function GOLD_NOW() {
+  try {
+    var pairs = _goldPairs(_goldFetch(_GOLD_DAY));
+    if (pairs.length) return pairs[pairs.length - 1].buy;
+    var daily = _goldPairs(_goldFetch(_GOLD_LTM));
+    return daily.length ? daily[0].buy : '';
+  } catch (e) { return ''; }
+}
+
+// 前一營業日價：每日表中「日期 < 今天」的第一筆「本行買進」
+function GOLD_PREV() {
+  try {
+    var html = _goldFetch(_GOLD_LTM);
+    var today = Utilities.formatDate(new Date(), 'GMT+8', 'yyyy/MM/dd');
+    var re = /(\d{4}\/\d{2}\/\d{2})<\/a><\/td>[\s\S]*?<td class="text-right">\s*([\d,.]+)\s*<\/td>\s*<td class="text-right">\s*([\d,.]+)\s*<\/td>/g;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+      if (m[1] < today) return Number(m[2].replace(/,/g, ''));
+    }
+    var daily = _goldPairs(html);
+    return daily.length ? daily[0].buy : '';
+  } catch (e) { return ''; }
+}
