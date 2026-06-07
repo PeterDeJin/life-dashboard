@@ -353,10 +353,11 @@ function autoLogRecurring() {
 function setupTriggers() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     var fn = t.getHandlerFunction();
-    if (fn === 'autoLogRecurring' || fn === 'dailyLogReminder') ScriptApp.deleteTrigger(t);
+    if (fn === 'autoLogRecurring' || fn === 'dailyLogReminder' || fn === 'updateBetas') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('autoLogRecurring').timeBased().everyDays(1).atHour(2).create();   // 每天凌晨 2 點：固定支出自動記帳
   ScriptApp.newTrigger('dailyLogReminder').timeBased().everyDays(1).atHour(22).create();  // 每天 22 點：記帳提醒
+  ScriptApp.newTrigger('updateBetas').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(3).create(); // 每週日 3 點：更新個股 Beta
 }
 
 // =========================================================
@@ -419,3 +420,87 @@ function _stockPrice(code) {
 
 function STOCK_NOW(code)  { var p = _stockPrice(code); return p ? p.now : ''; }
 function STOCK_PREV(code) { var p = _stockPrice(code); return (p && p.prev !== '' && p.prev != null) ? p.prev : ''; }
+
+// =========================================================
+// 個股 Beta（對台股加權指數 ^TWII，用兩年週報酬自己算）
+// 建議用 updateBetas() 排程每週把整欄寫好；BETA(code) 給臨時查單檔用
+// =========================================================
+function _weeklyCloses(sym) {
+  try {
+    var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + sym + '?interval=1wk&range=2y';
+    var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (res.getResponseCode() !== 200) return null;
+    var r = JSON.parse(res.getContentText());
+    r = r && r.chart && r.chart.result && r.chart.result[0];
+    if (!r || !r.timestamp) return null;
+    var ts = r.timestamp, cl = r.indicators.quote[0].close, out = {};
+    for (var i = 0; i < ts.length; i++) if (cl[i] != null) out[ts[i]] = cl[i];
+    return out;
+  } catch (e) { return null; }
+}
+
+function _marketCloses() { return _weeklyCloses('%5ETWII'); } // ^TWII 加權指數
+
+function _stockCloses(code) {
+  code = String(code).trim();
+  return _weeklyCloses(code + '.TW') || _weeklyCloses(code + '.TWO');
+}
+
+function _betaFromCloses(stock, mkt) {
+  if (!stock || !mkt) return '';
+  var keys = [];
+  for (var k in stock) if (mkt[k] != null) keys.push(Number(k));
+  keys.sort(function (a, b) { return a - b; });
+  if (keys.length < 20) return ''; // 樣本太少不算
+  var sr = [], mr = [];
+  for (var i = 1; i < keys.length; i++) {
+    sr.push(stock[keys[i]] / stock[keys[i - 1]] - 1);
+    mr.push(mkt[keys[i]] / mkt[keys[i - 1]] - 1);
+  }
+  var n = mr.length, mbar = 0, sbar = 0, j;
+  for (j = 0; j < n; j++) { mbar += mr[j]; sbar += sr[j]; }
+  mbar /= n; sbar /= n;
+  var cov = 0, varr = 0;
+  for (j = 0; j < n; j++) { cov += (mr[j] - mbar) * (sr[j] - sbar); varr += (mr[j] - mbar) * (mr[j] - mbar); }
+  if (varr === 0) return '';
+  return Math.round((cov / varr) * 100) / 100;
+}
+
+// 自訂函數：臨時查單檔（別整欄都用這個，會打很多次 API）
+function BETA(code) {
+  try {
+    code = String(code).trim().replace(/\.\d+$/, '');
+    if (!code) return '';
+    return _betaFromCloses(_stockCloses(code), _marketCloses());
+  } catch (e) { return ''; }
+}
+
+// 批次：把 Portfolio 的「個股 Beta」整欄重算寫入（排程每週跑一次）
+function updateBetas() {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(60000); } catch (e) { return; }
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Portfolio');
+    if (!sheet) return;
+    var data = sheet.getDataRange().getValues();
+    var head = data[0];
+    var nameIdx = _colIndex(head, ['項目名稱', '項目']);
+    var betaIdx = _colIndex(head, ['個股 Beta', '個股Beta', 'Beta']);
+    if (nameIdx < 0 || betaIdx < 0) return;
+
+    var mkt = _marketCloses();
+    if (!mkt) return;
+
+    for (var r = 1; r < data.length; r++) {
+      var name = String(data[r][nameIdx]).trim();
+      if (!/^[0-9]{4,6}[A-Z]?$/.test(name)) continue; // 只算看起來像股票代號的列
+      var b = _betaFromCloses(_stockCloses(name), mkt);
+      if (b !== '') sheet.getRange(r + 1, betaIdx + 1).setValue(b);
+      Utilities.sleep(150); // 緩一下，對來源友善
+    }
+  } catch (e) {
+    _bark('Beta 更新失敗', String(e));
+  } finally {
+    lock.releaseLock();
+  }
+}
