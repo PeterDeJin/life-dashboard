@@ -7,10 +7,10 @@
 var SCHEMAS = {
   Habit_Log:   [['date',['日期']],['english',['英文']],['exercise',['運動習慣','運動']],['reading',['讀書習慣','讀書']],['sleeping',['睡覺習慣','睡覺']]],
   Asset_Log:   [['date',['日期']],['account',['帳戶']],['category',['資產類別','類別']],['item',['項目名稱','項目']],['qty',['數量','持有數量']],['amount',['金額']],['type',['交易型態','型態']]],
-  Expenses_DB: [['date',['日期']],['category',['類別']],['item',['項目','項目名稱']],['amount',['金額']],['account',['帳戶']],['type',['收支']]],
+  Expenses_DB: [['date',['日期']],['category',['類別']],['item',['項目','項目名稱']],['amount',['金額']],['account',['帳戶']],['type',['收支']],['id',['ID']]],
   Media_Log:   [['date',['日期']],['type',['類別']],['title',['標題']],['rating',['評分']],['comment',['心得']]],
   Events_DB:   [['title',['事件名稱']],['date',['日期']],['type',['類型']]],
-  Wishlist_DB: [['date',['日期']],['item',['項目名稱','項目']],['amount',['預估金額','金額']],['note',['連結/備註','連結','備註']]]
+  Wishlist_DB: [['date',['日期']],['item',['項目名稱','項目']],['amount',['預估金額','金額']],['note',['連結/備註','連結','備註']],['id',['ID']]]
 };
 
 function out(s)     { return ContentService.createTextOutput(s); }
@@ -91,6 +91,18 @@ function doPost(e) {
 
     // ===== A. 刪除 =====
     if (postData.action === "delete") {
+      // 優先用 ID 精準刪除（新資料才有 ID；掃全部、不限最近 30 筆）
+      if (postData.id) {
+        var dAll = sheet.getDataRange().getValues();
+        var idC = _colIndex(dAll[0], ['ID']);
+        if (idC >= 0) {
+          for (var ri = dAll.length - 1; ri >= 1; ri--) {
+            if (String(dAll[ri][idC]).trim() === String(postData.id).trim()) { sheet.deleteRow(ri + 1); return out("Deleted"); }
+          }
+        }
+        // 找不到 ID 就往下用舊比對（相容沒 ID 的舊資料）
+      }
+
       var targetDate = postData.date.toString().replace(/-/g, "/").trim();
       var targetItem = postData.item.toString().trim();
       var targetAmount = parseFloat(postData.amount.toString().replace(/,/g, ""));
@@ -146,6 +158,28 @@ function doPost(e) {
       var rowsB = records.map(function(rec) { return buildRowByHeader(headersB, schemaB, rec); });
       sheet.getRange(sheet.getLastRow() + 1, 1, rowsB.length, width).setValues(rowsB);
       return out("Success");
+    }
+
+    // ===== C2. 依 ID 更新整筆 =====
+    if (postData.action === "update") {
+      var schemaU = SCHEMAS[tabName];
+      if (!schemaU) return out("Error: 不支援更新的分頁 " + tabName);
+      var du = sheet.getDataRange().getValues();
+      var hu = du[0];
+      var idc = _colIndex(hu, ['ID']);
+      if (idc < 0) return out("Error: 此分頁沒有 ID 欄，無法精準更新");
+      for (var ru = du.length - 1; ru >= 1; ru--) {
+        if (String(du[ru][idc]).trim() === String(postData.id).trim()) {
+          var rowv = du[ru].slice(); // 從現有列出發，只覆蓋有給的欄位（保留未對應欄位）
+          schemaU.forEach(function (f) {
+            var idx = _colIndex(hu, f[1]);
+            if (idx >= 0 && postData[f[0]] !== undefined) rowv[idx] = postData[f[0]];
+          });
+          sheet.getRange(ru + 1, 1, 1, rowv.length).setValues([rowv]);
+          return out("Updated");
+        }
+      }
+      return out("NotFound");
     }
 
     // ===== D. 單筆寫入（依標題對應，不再依位置）=====

@@ -461,6 +461,8 @@ Chart.defaults.set('plugins.datalabels', { display: false });
 let myChart=null, assetChart=null, incomeChart=null, compareChart=null, trendChart=null;
 let globalSnapshotData=[], globalTotalAssets=0, globalLivingFunds=0, globalExpensesData=[];
 let expShowCount=20; // 記帳列表目前顯示筆數（「載入更多」會增加）
+let editingExpenseId=null; // 記帳編輯模式：非 null 表示正在編輯該筆 ID
+function newId(){ return 'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); } // 唯一 ID
 
 // ==========================================
 // 📦 快取系統（避免重複打 API）
@@ -640,15 +642,16 @@ function setupDelegation() {
     const expList = document.getElementById('expenseList');
     if (expList) expList.addEventListener('click', e => {
         if (e.target.closest('.more-exp')) { expShowCount += 20; renderExpenseList(); return; }
+        const ed = e.target.closest('.edit-exp'); if (ed) { editExpense(ed.dataset.id); return; }
         const b = e.target.closest('.del-exp'); if (!b) return;
-        deleteExpense(b.dataset.d, b.dataset.i, b.dataset.a, b);
+        deleteExpense(b.dataset.d, b.dataset.i, b.dataset.a, b, b.dataset.id);
     });
     const wish = document.getElementById('wishlistContainer');
     if (wish) wish.addEventListener('click', e => {
         const buy = e.target.closest('.buy-wish');
-        if (buy) { fillExpense(buy.dataset.d, buy.dataset.i, buy.dataset.a, buy); return; }
+        if (buy) { fillExpense(buy.dataset.d, buy.dataset.i, buy.dataset.a, buy, buy.dataset.id); return; }
         const del = e.target.closest('.del-wish');
-        if (del) { deleteWish(del.dataset.d, del.dataset.i, del.dataset.a, del); }
+        if (del) { deleteWish(del.dataset.d, del.dataset.i, del.dataset.a, del, del.dataset.id); }
     });
 }
 
@@ -996,19 +999,41 @@ function submitExpense() {
     const btn=document.getElementById('btnExp');
     const v={tab:"Expenses_DB",date:document.getElementById('expDate').value,type:document.getElementById('expType').value,account:document.getElementById('expAccount').value,category:document.getElementById('expCategory').value,item:document.getElementById('expItem').value,amount:document.getElementById('expAmount').value};
     if(!v.item||!v.amount){toast("請輸入項目和金額", 'error');return;}
-    btn.innerText="寫入中...";btn.disabled=true;
-    const reset = () => { btn.disabled=false; btn.innerText="記一筆"; };
+    const editing=editingExpenseId;
+    if(editing){ v.action="update"; v.id=editing; } else { v.id=newId(); }
+    btn.disabled=true; btn.innerText = editing ? "更新中..." : "寫入中...";
+    const reset = () => { btn.disabled=false; btn.innerText = editing ? "✏️ 更新這筆" : "記一筆"; };
     apiPost(v).then(data=>{
-        if(data.includes("Success")){
-            toast("💸 記帳成功！", 'success'); reset();
+        if(data.includes("Success")||data.includes("Updated")){
+            toast(editing ? "✏️ 已更新！" : "💸 記帳成功！", 'success');
+            cancelEditExpense();
             document.getElementById('expItem').value="";document.getElementById('expAmount').value="";
             invalidateCache('Expenses_DB');loadExpenses();loadExpenseComparison();loadAccountBalances();loadTrendChart();
         } else {toast("失敗："+data, 'error'); reset();}
     }).catch(() => { toast("連線錯誤，請重試", 'error'); reset(); });
 }
+function cancelEditExpense(){
+    editingExpenseId=null;
+    const btn=document.getElementById('btnExp'); if(btn){ btn.innerText="記一筆"; btn.style.background="#e91e63"; }
+}
+function editExpense(id){
+    const row=(globalExpensesData||[]).find(r=>String(r.ID)===String(id));
+    if(!row){ toast("找不到該筆紀錄",'error'); return; }
+    document.getElementById('expDate').value=String(row.日期||"").replace(/\//g,"-").split("T")[0];
+    document.getElementById('expType').value=row.收支||"支出";
+    document.getElementById('expAccount').value=row.帳戶||"";
+    document.getElementById('expCategory').value=String(fCategory(row))||"";
+    document.getElementById('expItem').value=String(fItem(row));
+    document.getElementById('expAmount').value=n(row.金額);
+    editingExpenseId=id;
+    const btn=document.getElementById('btnExp'); if(btn){ btn.innerText="✏️ 更新這筆"; btn.style.background="#fb8c00"; }
+    document.getElementById('expItem').scrollIntoView({behavior:"smooth",block:"center"});
+    toast("編輯模式：改完按「更新這筆」",'info');
+}
 
 // 快速帶入
 function quickFill(item,category,amount,account){
+    cancelEditExpense(); // 點快速帶入即離開編輯模式
     document.getElementById('expItem').value=item;
     document.getElementById('expCategory').value=category;
     document.getElementById('expAmount').value=amount;
@@ -1067,7 +1092,9 @@ function renderExpenseList() {
         const isIncome=row.收支==="收入";
         const color=isIncome?"#4caf50":"#e91e63", sign=isIncome?"+":"-";
         const d=formatDate(row.日期), item=String(fItem(row)), cat=esc(fCategory(row)), acc=esc(row.帳戶||"");
-        html+=`<li style="padding:10px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;"><div style="flex:1;"><span style="font-weight:bold;color:#555;">${esc(item)}</span><span style="font-size:0.85em;color:#999;margin-left:5px;">(${d})</span><br><span style="font-size:0.85em;background:#f0f0f0;padding:2px 6px;border-radius:4px;">${cat}</span> <span style="font-size:0.85em;background:#f0f0f0;padding:2px 6px;border-radius:4px;">${acc}</span></div><div style="font-weight:bold;color:${color};margin-right:10px;">${sign}$${n(row.金額).toLocaleString()}</div><button class="del-exp" data-d="${esc(d)}" data-i="${esc(item)}" data-a="${esc(row.金額)}" style="background:#ffebee;color:#c62828;padding:5px 10px;font-size:0.8rem;border-radius:5px;box-shadow:none;border:1px solid #ffcdd2;">🗑️</button></li>`;
+        const id=(row.ID!==undefined&&row.ID!=='')?String(row.ID):"";
+        const editBtn=id?`<button class="edit-exp" data-id="${esc(id)}" style="background:#fff3e0;color:#e65100;padding:5px 9px;font-size:0.8rem;border-radius:5px;box-shadow:none;border:1px solid #ffe0b2;margin-right:5px;">✏️</button>`:"";
+        html+=`<li style="padding:10px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;"><div style="flex:1;"><span style="font-weight:bold;color:#555;">${esc(item)}</span><span style="font-size:0.85em;color:#999;margin-left:5px;">(${d})</span><br><span style="font-size:0.85em;background:#f0f0f0;padding:2px 6px;border-radius:4px;">${cat}</span> <span style="font-size:0.85em;background:#f0f0f0;padding:2px 6px;border-radius:4px;">${acc}</span></div><div style="font-weight:bold;color:${color};margin-right:10px;">${sign}$${n(row.金額).toLocaleString()}</div>${editBtn}<button class="del-exp" data-id="${esc(id)}" data-d="${esc(d)}" data-i="${esc(item)}" data-a="${esc(row.金額)}" style="background:#ffebee;color:#c62828;padding:5px 10px;font-size:0.8rem;border-radius:5px;box-shadow:none;border:1px solid #ffcdd2;">🗑️</button></li>`;
     });
     if(ordered.length>display.length){
         html+=`<li style="text-align:center;padding:10px;"><button class="more-exp" style="background:#eceff1;color:#555;box-shadow:none;padding:6px 18px;font-size:0.85rem;">載入更多（還有 ${ordered.length-display.length} 筆）</button></li>`;
@@ -1333,7 +1360,7 @@ function loadWishlist(){
             let name=String(fItem(row)), price=fAmount(row), ds=formatDate(row['日期']);
             let diff=globalLivingFunds-price, bg=diff>=0?"#e8f5e9":"#fff";
             let status=diff>=0?`<span style="color:#2e7d32;font-weight:bold;">✅ 可購買 (剩 $${diff.toLocaleString()})</span>`:`<span style="color:#c62828;">❌ 差 $${Math.abs(diff).toLocaleString()}</span>`;
-            let dataAttr=`data-d="${esc(ds)}" data-i="${esc(name)}" data-a="${esc(price)}"`;
+            let dataAttr=`data-d="${esc(ds)}" data-i="${esc(name)}" data-a="${esc(price)}" data-id="${esc(row.ID!==undefined?row.ID:'')}"`;
             let buyBtn=diff>=0?`<button class="buy-wish" ${dataAttr} style="padding:5px 10px;font-size:0.8em;background:#4caf50;color:white;border:none;border-radius:5px;cursor:pointer;">購買</button>`:"";
             let delBtn=`<button class="del-wish" ${dataAttr} style="padding:5px 8px;font-size:0.8em;background:#ffebee;color:#c62828;border:1px solid #ffcdd2;border-radius:5px;margin-left:5px;cursor:pointer;">🗑️</button>`;
             return `<div id="wish-${i}" style="background:${bg};padding:12px;border-radius:8px;border:1px solid #eee;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-weight:bold;color:#333;">${esc(name)}</div><div style="font-size:0.9em;color:#666;">$${price.toLocaleString()}</div><div style="margin-top:2px;font-size:0.9em;">${status}</div></div><div style="display:flex;align-items:center;">${buyBtn}${delBtn}</div></div>`;
@@ -1345,13 +1372,13 @@ function submitWish(btn){
     const item=document.getElementById('wishItem').value, amt=document.getElementById('wishAmount').value;
     if(!item||!amt){toast("請填寫完整",'error');return;}
     btn.disabled=true;
-    apiPost({tab:"Wishlist_DB",date:new Date().toISOString().split('T')[0],item,amount:amt,note:document.getElementById('wishNote').value}).then(d=>{
+    apiPost({tab:"Wishlist_DB",date:new Date().toISOString().split('T')[0],item,amount:amt,note:document.getElementById('wishNote').value,id:newId()}).then(d=>{
         if(d.includes("Success")){toast("✨ 許願成功！",'success');document.getElementById('wishItem').value="";document.getElementById('wishAmount').value="";document.getElementById('wishNote').value="";toggleWishForm();invalidateCache('Wishlist_DB');loadWishlist();}
         else toast("失敗："+d,'error');
         btn.disabled=false;
     }).catch(()=>{toast("連線錯誤，請重試",'error');btn.disabled=false;});
 }
-async function fillExpense(date,item,price,btnEl){
+async function fillExpense(date,item,price,btnEl,id){
     if(!await confirmDialog(`🎉 「${item}」將帶入記帳並從清單移除，確定嗎？`)) return;
     document.getElementById('expItem').value=item;document.getElementById('expAmount').value=price;document.getElementById('expType').value="支出";
     // 切換分頁，並正確設定導覽列 active
@@ -1361,14 +1388,14 @@ async function fillExpense(date,item,price,btnEl){
     document.querySelectorAll('.nav-item')[1].classList.add('active');
     document.getElementById('expItem').scrollIntoView({behavior:"smooth"});
     if(btnEl){let card=btnEl.closest('div[id^="wish-"]');if(card){card.style.transition="opacity 0.5s";card.style.opacity="0";setTimeout(()=>card.remove(),500);}}
-    apiPost({action:"delete",tab:"Wishlist_DB",date,item,amount:price}).catch(()=>{});
+    apiPost({action:"delete",tab:"Wishlist_DB",date,item,amount:price,id}).catch(()=>{});
     invalidateCache('Wishlist_DB');
     toast("已帶入記帳區，願望已移除",'success');
 }
-async function deleteWish(date,item,amount,btn){
+async function deleteWish(date,item,amount,btn,id){
     if(!await confirmDialog(`確定放棄「${item}」嗎？`)) return;
     btn.innerText="⏳";btn.disabled=true;
-    apiPost({action:"delete",tab:"Wishlist_DB",date,item,amount}).then(data=>{
+    apiPost({action:"delete",tab:"Wishlist_DB",date,item,amount,id}).then(data=>{
         if(data.includes("Deleted")){
             let card=btn.closest('div[id^="wish-"]');card.style.opacity="0";
             setTimeout(()=>{card.remove();toast("🗑️ 願望已移除！",'success');},500);
@@ -1376,14 +1403,15 @@ async function deleteWish(date,item,amount,btn){
         } else{toast("刪除失敗："+data,'error');btn.innerText="🗑️";btn.disabled=false;}
     }).catch(()=>{toast("連線錯誤，請重試",'error');btn.innerText="🗑️";btn.disabled=false;});
 }
-async function deleteExpense(date,item,amount,btn){
+async function deleteExpense(date,item,amount,btn,id){
     if(!await confirmDialog(`確定刪除「${item} $${amount}」嗎？`)) return;
     btn.innerText="⏳";btn.disabled=true;
-    apiPost({action:"delete",tab:"Expenses_DB",date,item,amount}).then(data=>{
+    apiPost({action:"delete",tab:"Expenses_DB",date,item,amount,id}).then(data=>{
         if(data.includes("Deleted")){
+            if(id&&String(id)===String(editingExpenseId)) cancelEditExpense();
             let li=btn.closest('li');li.style.opacity="0";
-            setTimeout(()=>{li.remove();invalidateCache('Expenses_DB');loadExpenseComparison();loadAccountBalances();toast("🗑️ 已刪除！",'success');},500);
-        } else if(data.includes("NotFound")){toast("❌ 找不到此紀錄（僅能刪除最近 30 筆）",'error');btn.innerText="🗑️";btn.disabled=false;}
+            setTimeout(()=>{li.remove();invalidateCache('Expenses_DB');loadExpenses();loadExpenseComparison();loadAccountBalances();toast("🗑️ 已刪除！",'success');},500);
+        } else if(data.includes("NotFound")){toast("❌ 找不到此紀錄（舊資料僅能刪最近 30 筆）",'error');btn.innerText="🗑️";btn.disabled=false;}
         else{toast("失敗："+data,'error');btn.innerText="🗑️";btn.disabled=false;}
     }).catch(()=>{toast("連線錯誤，請重試",'error');btn.innerText="🗑️";btn.disabled=false;});
 }
