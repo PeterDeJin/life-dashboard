@@ -912,6 +912,7 @@ function loadAssetChart() {
             if (name.toLowerCase().includes("beta")) {
                 beta=n(row['總市值']||row['持有數量']||row['即時單價']); return;
             }
+            if (/總資產|總金額|總計|合計|淨值/.test(name)) return; // 排除彙總列，避免重複計入與誤畫
             let origMv=n(row['總市值']), qty=n(row['持有數量']), pNow=n(row['即時單價']), pYest=n(row['昨日收盤']||row['即時單價']);
             let isCash=name.includes("郵局")||name.includes("富邦銀行")||name.includes("現金")||name.includes("錢包")||name.includes("中國信託");
             let mv=isCash?(dyn[name]!==undefined?dyn[name]:0):origMv;
@@ -944,9 +945,16 @@ function loadAssetChart() {
         rEl.innerText=(roi>=0?"+":"")+roi.toFixed(2)+"%"; rEl.style.color=roi>=0?"#ff9999":"#99ff99";
         let bEl=document.getElementById('portfolioBetaDisplay');
         if(bEl){if(beta!==null&&beta>0){bEl.innerText=beta.toFixed(2);bEl.style.color=beta>1.1?"#ff7675":beta<0.9?"#55efc4":"#fbc02d";}else{bEl.innerText="未設定";bEl.style.fontSize="1rem";bEl.style.color="#ccc";}}
+        // 配置圓餅：只留前 8 大，其餘併成「其他（N 檔）」，避免太多小塊
+        let pieArr=labels.map((l,idx)=>({label:l,value:values[idx]})).filter(x=>x.value>0).sort((a,b)=>b.value-a.value);
+        const TOPN=8;
+        let pieTop=pieArr.slice(0,TOPN), pieRest=pieArr.slice(TOPN);
+        let restSum=pieRest.reduce((s,x)=>s+x.value,0);
+        let pieLabels=pieTop.map(x=>x.label), pieValues=pieTop.map(x=>x.value), pieColors=pieTop.map((_,idx)=>palette[idx%palette.length]);
+        if(restSum>0){ pieLabels.push(`其他 (${pieRest.length} 檔)`); pieValues.push(restSum); pieColors.push('#cfcfcf'); }
         const ctx=document.getElementById('assetPieChart');
         if(assetChart) assetChart.destroy();
-        assetChart=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data:values,backgroundColor:colors}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right'},datalabels:{display:true,color:'#fff',font:{weight:'bold',size:11},formatter:(v,c)=>{let s=c.chart.data.datasets[0].data.reduce((a,b)=>a+b,0),p=v*100/s;return p<3?"":p.toFixed(1)+"%";}}}}});
+        assetChart=new Chart(ctx,{type:'doughnut',data:{labels:pieLabels,datasets:[{data:pieValues,backgroundColor:pieColors}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right'},datalabels:{display:true,color:'#fff',font:{weight:'bold',size:11},formatter:(v,c)=>{let s=c.chart.data.datasets[0].data.reduce((a,b)=>a+b,0),p=v*100/s;return p<3?"":p.toFixed(1)+"%";}}}}});
     });
 }
 
@@ -1170,16 +1178,18 @@ function submitTransfer() {
 function loadTrendChart() {
     fetchTab('History_Log').then(histData=>{
         if(!histData.length) return;
-        let gd={},dates=new Set(),tarr=[];
+        let dates=new Set(),tarr=[],totalByDate={},cat={股票:{},現金:{},黃金:{}};
+        const isCashName=nm=>/郵局|銀行|現金|錢包|中國信託|悠遊卡|icash|ipassmoney|學生證|一卡通|待付款/.test(nm);
         histData.forEach(r=>{
             let ds=r.日期; if(!ds) return;
             let p=String(ds).replace(/\//g,"-").split("T")[0].split("-");
             let key=p.join("/"), ts=p.length>=3?new Date(+p[0],+p[1]-1,+p[2]).getTime():0;
             dates.add(key);
-            let item=r.資產名稱, val=n(r.現淨值);
-            if(!gd[item]) gd[item]={};
-            gd[item][key]=val;
-            if(item==="總資產"&&val>0) tarr.push({ts,val,key});
+            let item=String(r.資產名稱||""), val=n(r.現淨值);
+            if(item==="總資產"){ totalByDate[key]=val; if(val>0) tarr.push({ts,val,key}); return; }
+            if(/總金額|總計|合計|淨值/.test(item)||item.toLowerCase().includes("beta")) return;
+            let c=/黃金|gold/i.test(item)?'黃金':(isCashName(item)?'現金':'股票');
+            cat[c][key]=(cat[c][key]||0)+val;
         });
         tarr.sort((a,b)=>a.ts-b.ts);
         const predEl=document.getElementById('predictionText');
@@ -1192,9 +1202,13 @@ function loadTrendChart() {
                 else predEl.innerHTML="📉 資產暫時縮水，加油！";
             } else predEl.innerText="⏳ 數據累積中...";
         }
-        let sd=Array.from(dates).sort((a,b)=>new Date(a)-new Date(b)), ds2=[], colors=['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40','#C9CBCF'], ci=0;
-        if(gd["總資產"]){ds2.push({label:"總資產",data:sd.map(d=>gd["總資產"][d]||null),borderColor:"#333",borderWidth:3,tension:0.1,pointRadius:4,yAxisID:'y'});delete gd["總資產"];}
-        for(let item in gd){ds2.push({label:item,data:sd.map(d=>gd[item][d]||null),borderColor:colors[ci%colors.length],backgroundColor:colors[ci%colors.length],borderWidth:2,tension:0.1,pointRadius:3,yAxisID:'y'});ci++;}
+        let sd=Array.from(dates).sort((a,b)=>new Date(a)-new Date(b)), ds2=[];
+        ds2.push({label:"總資產",data:sd.map(d=>totalByDate[d]!=null?totalByDate[d]:null),borderColor:"#333",borderWidth:3,tension:0.1,pointRadius:4,yAxisID:'y'});
+        const catStyle={股票:'#36A2EB',現金:'#4BC0C0',黃金:'#FFB300'};
+        ['股票','現金','黃金'].forEach(c=>{
+            let series=sd.map(d=>cat[c][d]!=null?cat[c][d]:null);
+            if(series.some(v=>v!=null&&v!==0)) ds2.push({label:c,data:series,borderColor:catStyle[c],backgroundColor:catStyle[c],borderWidth:2,tension:0.1,pointRadius:3,yAxisID:'y'});
+        });
         const ctx=document.getElementById('trendChart');if(trendChart) trendChart.destroy();
         trendChart=new Chart(ctx,{type:'line',data:{labels:sd,datasets:ds2},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:{y:{type:'linear',display:true,position:'left',title:{display:true,text:'市值 (TWD)'}}},plugins:{legend:{position:'bottom'}}}});
     });
