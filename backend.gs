@@ -360,37 +360,62 @@ function setupTriggers() {
 }
 
 // =========================================================
-// 台股即時報價（證交所 MIS API），給 GOOGLEFINANCE 抓不到的股票用
-// 用法：在「即時單價」欄打 =STOCK_NOW(A33)，「昨日收盤」欄打 =STOCK_PREV(A33)
-// 會自動試上市(tse)再試上櫃(otc)
+// 台股即時報價，給 GOOGLEFINANCE 抓不到的股票用
+// 用法：「即時單價」欄打 =STOCK_NOW(A33)，「昨日收盤」欄打 =STOCK_PREV(A33)
+// 來源：Yahoo Finance 為主（從 GAS 較穩），證交所 MIS 帶 cookie 備援
+// 上市 / 上櫃會自動判斷
 // =========================================================
-function _twQuoteRaw(code) {
-  code = String(code).trim().replace(/\.\d+$/, '');
-  if (!code) return null;
-  var prefixes = ['tse_', 'otc_'];
-  for (var i = 0; i < prefixes.length; i++) {
+function _round2(x) { return Math.round(Number(x) * 100) / 100; }
+
+function _stockFromYahoo(code) {
+  var sfx = ['TW', 'TWO']; // 上市 / 上櫃
+  for (var i = 0; i < sfx.length; i++) {
     try {
-      var url = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch=' + prefixes[i] + code + '.tw';
+      var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + code + '.' + sfx[i] + '?interval=1d&range=5d';
       var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0' } });
-      var data = JSON.parse(res.getContentText());
-      if (data && data.msgArray && data.msgArray.length) return data.msgArray[0];
+      if (res.getResponseCode() !== 200) continue;
+      var r = JSON.parse(res.getContentText());
+      r = r && r.chart && r.chart.result && r.chart.result[0];
+      if (!r || !r.meta || !r.meta.regularMarketPrice) continue;
+      var now = r.meta.regularMarketPrice;
+      var prev = r.meta.chartPreviousClose;
+      try {
+        var cl = r.indicators.quote[0].close.filter(function (x) { return x != null; });
+        if (cl.length >= 2) prev = cl[cl.length - 2]; // 倒數第二筆＝昨收
+      } catch (e) {}
+      return { now: _round2(now), prev: _round2(prev) };
     } catch (e) {}
   }
   return null;
 }
 
-// 現價：最新成交價(z)；無成交時退而求其次用最佳買價(b)、再不行用昨收(y)
-function STOCK_NOW(code) {
-  var d = _twQuoteRaw(code); if (!d) return '';
-  var z = parseFloat(d.z); if (!isNaN(z) && z > 0) return z;
-  var b = d.b ? parseFloat(String(d.b).split('_')[0]) : NaN; if (!isNaN(b) && b > 0) return b;
-  var y = parseFloat(d.y); if (!isNaN(y) && y > 0) return y;
-  return '';
+function _stockFromMIS(code) {
+  try {
+    // 先取 session cookie（MIS 對外部請求常需要）
+    var idx = UrlFetchApp.fetch('https://mis.twse.com.tw/stock/index.jsp', { muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    var ck = idx.getAllHeaders()['Set-Cookie'] || idx.getAllHeaders()['set-cookie'] || '';
+    if (ck instanceof Array) ck = ck.join('; ');
+    var hdr = { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://mis.twse.com.tw/stock/', 'Cookie': ck };
+    var ex = ['tse_', 'otc_'];
+    for (var i = 0; i < ex.length; i++) {
+      var url = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch=' + ex[i] + code + '.tw';
+      var d = JSON.parse(UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: hdr }).getContentText());
+      var a = d && d.msgArray && d.msgArray[0];
+      if (!a) continue;
+      var now = parseFloat(a.z);
+      if (isNaN(now) || now <= 0) { var b = a.b ? parseFloat(String(a.b).split('_')[0]) : NaN; now = (!isNaN(b) && b > 0) ? b : parseFloat(a.y); }
+      var prev = parseFloat(a.y);
+      if (!isNaN(now) && now > 0) return { now: _round2(now), prev: (!isNaN(prev) && prev > 0 ? _round2(prev) : '') };
+    }
+  } catch (e) {}
+  return null;
 }
 
-// 昨日收盤(y)
-function STOCK_PREV(code) {
-  var d = _twQuoteRaw(code); if (!d) return '';
-  var y = parseFloat(d.y); if (!isNaN(y) && y > 0) return y;
-  return '';
+function _stockPrice(code) {
+  code = String(code).trim().replace(/\.\d+$/, '');
+  if (!code) return null;
+  return _stockFromYahoo(code) || _stockFromMIS(code);
 }
+
+function STOCK_NOW(code)  { var p = _stockPrice(code); return p ? p.now : ''; }
+function STOCK_PREV(code) { var p = _stockPrice(code); return (p && p.prev !== '' && p.prev != null) ? p.prev : ''; }
