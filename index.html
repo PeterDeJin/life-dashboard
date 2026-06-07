@@ -87,6 +87,20 @@
         body.dark [style*="background:#f8f9fa"], body.dark [style*="background:#f9f9f9"], body.dark [style*="background:#f0f0f0"], body.dark [style*="background:#fff3e0"], body.dark [style*="background:#f0f4f8"], body.dark [style*="background:#fff3cd"], body.dark [style*="background:#fce4ec"] { background: #262626 !important; }
         body.dark [style*="background:white"], body.dark [style*="background:#fff"] { background: #1e1e1e !important; }
         body.dark [style*="solid #eee"], body.dark [style*="solid #f0f0f0"], body.dark [style*="solid #ddd"] { border-color: #333 !important; }
+        /* ===== 月曆 ===== */
+        .cal-row { display: grid; grid-template-columns: repeat(7, 1fr); }
+        .cal-cell { text-align: center; }
+        .cal-h { color: #999; font-size: 0.8rem; padding: 6px 0; }
+        .cal-day { min-height: 50px; border-radius: 8px; padding: 4px 0 2px; cursor: pointer; border: 1.5px solid transparent; }
+        .cal-day:hover { background: #f0f2f5; }
+        .cal-num { font-size: 0.9rem; color: #333; }
+        .cal-today .cal-num { background: #2a5298; color: #fff; border-radius: 50%; width: 24px; height: 24px; line-height: 24px; display: inline-block; }
+        .cal-sel { border-color: #2a5298; background: #eef3fb; }
+        .cal-dots { height: 8px; margin-top: 3px; line-height: 1; }
+        body.dark .cal-h { color: #888; }
+        body.dark .cal-num { color: #ddd; }
+        body.dark .cal-day:hover { background: #2a2a2a; }
+        body.dark .cal-sel { background: #23344d; }
     </style>
 </head>
 <body>
@@ -104,6 +118,16 @@
     <!-- HOME -->
     <div id="view-home" class="view-section active">
       <div class="stack">
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <button onclick="calShift(-1)" style="background:#eceff1;color:#555;box-shadow:none;padding:4px 14px;">◀</button>
+                <h2 id="calLabel" style="margin:0;font-size:1.1rem;">📅 行事曆</h2>
+                <button onclick="calShift(1)" style="background:#eceff1;color:#555;box-shadow:none;padding:4px 14px;">▶</button>
+            </div>
+            <div id="calGrid"></div>
+            <div id="calDetail" style="margin-top:12px;border-top:1px solid #eee;padding-top:10px;font-size:0.9em;"></div>
+        </div>
+
         <div class="row2">
         <div class="card full-width" style="background:linear-gradient(135deg,#2c3e50 0%,#4ca1af 100%);color:white;padding:20px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
@@ -635,7 +659,7 @@ function submitTodo(btn){
     const due = document.getElementById('todoDue').value, prio = document.getElementById('todoPriority').value;
     btn.disabled=true;
     apiPost({tab:"Todo_DB",title,due,priority:prio,done:false,id:newId()}).then(d=>{
-        if(d.includes("Success")){ toast("✅ 已新增",'success'); document.getElementById('todoTitle').value=""; document.getElementById('todoDue').value=""; invalidateCache('Todo_DB'); loadTodos(); }
+        if(d.includes("Success")){ toast("✅ 已新增",'success'); document.getElementById('todoTitle').value=""; document.getElementById('todoDue').value=""; invalidateCache('Todo_DB'); loadTodos(); loadCalendar(); }
         else toast("失敗："+d,'error');
         btn.disabled=false;
     }).catch(()=>{ toast("連線錯誤，請重試",'error'); btn.disabled=false; });
@@ -661,14 +685,14 @@ function loadTodos(){
 function toggleTodoDone(id, el){
     el.textContent="⏳";
     apiPost({action:"update",tab:"Todo_DB",id,done:true}).then(d=>{
-        if(d.includes("Updated")){ toast("完成 ✅",'success'); invalidateCache('Todo_DB'); loadTodos(); }
+        if(d.includes("Updated")){ toast("完成 ✅",'success'); invalidateCache('Todo_DB'); loadTodos(); loadCalendar(); }
         else{ toast("失敗："+d,'error'); el.textContent="⬜"; }
     }).catch(()=>{ toast("連線錯誤",'error'); el.textContent="⬜"; });
 }
 function deleteTodo(id, btn){
     btn.innerText="⏳"; btn.disabled=true;
     apiPost({action:"delete",tab:"Todo_DB",id}).then(d=>{
-        if(d.includes("Deleted")){ invalidateCache('Todo_DB'); loadTodos(); }
+        if(d.includes("Deleted")){ invalidateCache('Todo_DB'); loadTodos(); loadCalendar(); }
         else{ toast("刪除失敗："+d,'error'); btn.innerText="🗑️"; btn.disabled=false; }
     }).catch(()=>{ toast("連線錯誤",'error'); btn.innerText="🗑️"; btn.disabled=false; });
 }
@@ -711,6 +735,78 @@ function loadMood(){
         if(moodChart) moodChart.destroy();
         moodChart=new Chart(ctx,{type:'line',data:{labels:keys,datasets:[{label:'心情',data:keys.map(k=>byDate[k]),borderColor:'#ec407a',backgroundColor:'rgba(236,64,122,0.15)',fill:true,tension:0.35,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{min:1,max:5,ticks:{stepSize:1,callback:v=>MOOD_EMOJI[v]||v}}},plugins:{legend:{display:false}}}});
     }).catch(()=>{});
+}
+
+// ========== 行事曆 ==========
+let calYear, calMonth, calSelected=null, calTodoMap={}, calEvents=[], calRecs=[];
+function calKey(y,m,d){ return y+'/'+String(m+1).padStart(2,'0')+'/'+String(d).padStart(2,'0'); }
+function buildCalData(){
+    return Promise.all([fetchTab('Todo_DB'),fetchTab('Events_DB'),fetchTab('Recurring_DB')]).then(([todos,events,recs])=>{
+        calTodoMap={};
+        (Array.isArray(todos)?todos:[]).forEach(r=>{
+            if(_isDone(r.完成)) return;
+            const t=String(r.任務||r.項目||'').trim(); if(!t||!r.截止日) return;
+            let d=new Date(String(r.截止日).replace(/\//g,'-')); if(isNaN(d)) return;
+            const pr=String(r.優先||'中'), col=pr==='高'?'#e53935':pr==='低'?'#4caf50':'#fbc02d';
+            const k=calKey(d.getFullYear(),d.getMonth(),d.getDate());
+            (calTodoMap[k]=calTodoMap[k]||[]).push({label:'✅ '+t,color:col});
+        });
+        calEvents=(Array.isArray(events)?events:[]).map(r=>{
+            const t=String(r.事件名稱||r.title||'').trim(); const dv=r.日期||r.date; if(!t||!dv) return null;
+            let p=String(dv).replace(/\//g,'-').split('T')[0].split('-'); if(p.length<3) return null;
+            return {y:+p[0],m:+p[1]-1,d:+p[2],type:String(r.類型||r.type||'fixed').toLowerCase().trim(),title:t};
+        }).filter(Boolean);
+        calRecs=(Array.isArray(recs)?recs:[]).map(r=>{
+            const on=['TRUE','是','1','Y','YES','ON',''].indexOf(String(r.啟用!==undefined?r.啟用:'TRUE').trim().toUpperCase())>=0;
+            const t=String(r.項目||r.項目名稱||'').trim(); const day=Number(r.扣款日||r['每月幾號']);
+            if(!on||!t||!day) return null;
+            return {day,title:t,amt:n(r.金額)};
+        }).filter(Boolean);
+    });
+}
+function calItems(y,m,d){
+    let arr=(calTodoMap[calKey(y,m,d)]||[]).slice();
+    calEvents.forEach(e=>{ if(e.m===m && e.d===d && (e.type==='yearly' || e.y===y)) arr.push({label:'🎯 '+e.title,color:'#9c27b0'}); });
+    const last=new Date(y,m+1,0).getDate();
+    calRecs.forEach(r=>{ if(Math.min(r.day,last)===d) arr.push({label:'💸 '+r.title+(r.amt?(' $'+r.amt.toLocaleString()):''),color:'#e91e63'}); });
+    return arr;
+}
+function renderCalendar(){
+    const grid=document.getElementById('calGrid'); if(!grid) return;
+    const now=new Date(), tKey=calKey(now.getFullYear(),now.getMonth(),now.getDate());
+    const lbl=document.getElementById('calLabel'); if(lbl) lbl.textContent='📅 '+calYear+'年 '+(calMonth+1)+'月';
+    const first=new Date(calYear,calMonth,1).getDay(), days=new Date(calYear,calMonth+1,0).getDate();
+    let html='<div class="cal-row">'+['日','一','二','三','四','五','六'].map(x=>`<div class="cal-cell cal-h">${x}</div>`).join('')+'</div>';
+    let cells=[]; for(let i=0;i<first;i++) cells.push(''); for(let d=1;d<=days;d++) cells.push(d); while(cells.length%7) cells.push('');
+    for(let w=0;w<cells.length;w+=7){
+        html+='<div class="cal-row">';
+        for(let i=0;i<7;i++){
+            const d=cells[w+i];
+            if(d===''){ html+='<div class="cal-cell"></div>'; continue; }
+            const key=calKey(calYear,calMonth,d), items=calItems(calYear,calMonth,d);
+            const dots=items.slice(0,4).map(x=>`<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${x.color};margin:0 1px;"></span>`).join('');
+            html+=`<div class="cal-cell cal-day${key===tKey?' cal-today':''}${key===calSelected?' cal-sel':''}" data-key="${key}"><div class="cal-num">${d}</div><div class="cal-dots">${dots}</div></div>`;
+        }
+        html+='</div>';
+    }
+    grid.innerHTML=html;
+    renderCalDetail(calSelected||tKey);
+}
+function renderCalDetail(key){
+    calSelected=key;
+    const box=document.getElementById('calDetail'); if(!box) return;
+    const p=key.split('/'), items=calItems(+p[0],+p[1]-1,+p[2]);
+    const head=`<div style="font-weight:bold;margin-bottom:6px;color:#333;">${key}</div>`;
+    box.innerHTML = items.length
+        ? head+items.map(x=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${x.color};flex:none;"></span><span style="color:#444;">${esc(x.label)}</span></div>`).join('')
+        : head+"<div style='color:#bbb;'>這天沒有安排</div>";
+    document.querySelectorAll('#calGrid .cal-day').forEach(el=>el.classList.toggle('cal-sel', el.dataset.key===key));
+}
+function calShift(delta){ calMonth+=delta; if(calMonth<0){calMonth=11;calYear--;} if(calMonth>11){calMonth=0;calYear++;} calSelected=null; renderCalendar(); }
+function loadCalendar(){
+    const now=new Date();
+    if(calYear===undefined){ calYear=now.getFullYear(); calMonth=now.getMonth(); }
+    buildCalData().then(renderCalendar).catch(()=>{ const g=document.getElementById('calGrid'); if(g) g.innerHTML="<div style='color:#ccc;'>讀取失敗</div>"; });
 }
 
 // ===== 下拉選單自動生成 =====
@@ -779,6 +875,8 @@ function setupDelegation() {
         const ck = e.target.closest('.todo-check'); if (ck) { toggleTodoDone(ck.dataset.id, ck); return; }
         const dl = e.target.closest('.todo-del'); if (dl) { deleteTodo(dl.dataset.id, dl); }
     });
+    const calG = document.getElementById('calGrid');
+    if (calG) calG.addEventListener('click', e => { const c = e.target.closest('.cal-day'); if (c && c.dataset.key) renderCalDetail(c.dataset.key); });
     setupMoodPicker();
 }
 
@@ -829,6 +927,7 @@ window.onload = async function() {
     loadRecurring();
     loadTodos();
     loadMood();
+    loadCalendar();
 
     applyDarkMode(); // 同步深色狀態與按鈕文字
 };
@@ -1453,7 +1552,7 @@ function submitEvent(btn){
     btn.innerText="寫入中...";btn.disabled=true;
     const reset=()=>{btn.innerText="新增";btn.disabled=false;};
     apiPost({tab:"Events_DB",title,date,type}).then(data=>{
-        if(data.includes("Success")){toast("🎉 新增成功！",'success');document.getElementById('evtTitle').value="";toggleEventForm();invalidateCache('Events_DB');loadTimeWidget();}
+        if(data.includes("Success")){toast("🎉 新增成功！",'success');document.getElementById('evtTitle').value="";toggleEventForm();invalidateCache('Events_DB');loadTimeWidget();loadCalendar();}
         else toast("失敗："+data,'error');
         reset();
     }).catch(()=>{toast("連線錯誤，請重試",'error');reset();});
