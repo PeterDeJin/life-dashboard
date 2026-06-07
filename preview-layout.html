@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>版面示意</title>
+<style>
+  body { font-family:'微軟正黑體',sans-serif; background:#f4f7f6; margin:0; padding:15px 15px 80px; -webkit-font-smoothing:antialiased; }
+  .container { max-width:1280px; width:100%; margin:0 auto; }
+  h1 { text-align:center; margin:10px 0 20px; }
+  /* 新版核心：響應式多欄網格 */
+  .layout { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:20px; align-items:start; }
+  .span-all { grid-column:1 / -1; }            /* 跨整列：英雄卡、需要寬度的圖/表 */
+  .card { background:#fff; padding:20px; border-radius:15px; box-shadow:0 4px 12px rgba(0,0,0,0.08); }
+  .card h2 { margin:0 0 12px; font-size:1.15rem; }
+  .ph { background:repeating-linear-gradient(45deg,#f0f2f5,#f0f2f5 10px,#e9edf1 10px,#e9edf1 20px); border-radius:10px; display:flex; align-items:center; justify-content:center; color:#9aa3ad; font-size:0.9rem; }
+  table { width:100%; border-collapse:collapse; font-size:0.9em; }
+  th,td { padding:8px 6px; border-bottom:1px solid #eee; text-align:left; }
+  td.r,th.r { text-align:right; }
+  .bottom-nav { position:fixed; bottom:0; left:0; width:100%; background:#fff; border-top:1px solid #ddd; display:flex; justify-content:space-around; padding:10px 0; box-shadow:0 -2px 10px rgba(0,0,0,0.05); }
+  .nav-item { display:flex; flex-direction:column; align-items:center; font-size:0.8rem; color:#888; }
+  .nav-item.active { color:#2a5298; font-weight:bold; }
+  .nav-item span { font-size:1.5rem; }
+  .roi { display:flex; justify-content:center; gap:30px; margin-top:20px; border-top:1px solid rgba(255,255,255,0.2); padding-top:15px; flex-wrap:wrap; }
+  .roi div div:first-child { font-size:0.85rem; opacity:0.8; }
+  .roi div div:last-child { font-size:1.2rem; font-weight:bold; }
+  .note { max-width:1280px; margin:0 auto 16px; background:#fff8e1; border-left:4px solid #ffb300; padding:12px 16px; border-radius:8px; color:#7c5b00; font-size:0.92rem; }
+</style>
+</head>
+<body>
+  <div class="note">版面示意（假資料）。重點：桌機把卡片排成多欄、填滿寬度、頁面變短；手機自動變回單欄。把瀏覽器視窗拉窄就能看到它自動收成一欄。</div>
+  <div class="container">
+    <h1>🚀 My Life Dashboard — 資產</h1>
+    <div class="layout">
+
+      <!-- 英雄卡：跨整列 -->
+      <div class="card span-all" style="background:linear-gradient(135deg,#1e3c72,#2a5298);color:#fff;text-align:center;padding:28px;">
+        <div style="font-size:1.1rem;opacity:0.85;">💰 總資產淨值</div>
+        <div style="font-size:3.2rem;font-weight:bold;margin:8px 0;">$1,331,102</div>
+        <div style="display:flex;justify-content:space-between;font-size:0.9em;opacity:0.9;margin:14px auto 4px;max-width:520px;"><span>🎯 第一桶金目標</span><span>89%</span></div>
+        <div style="max-width:520px;margin:0 auto;height:8px;background:rgba(255,255,255,0.25);border-radius:10px;overflow:hidden;"><div style="width:89%;height:100%;background:#4ade80;"></div></div>
+        <div class="roi">
+          <div><div>成本</div><div>$1,150,000</div></div>
+          <div><div>損益</div><div style="color:#ff9999;">+$181,102</div></div>
+          <div><div>ROI</div><div style="color:#ff9999;">+15.7%</div></div>
+          <div><div>組合 Beta</div><div style="color:#fbc02d;">1.26</div></div>
+        </div>
+      </div>
+
+      <!-- 趨勢圖：跨整列（需要寬度）-->
+      <div class="card span-all">
+        <h2>📈 資產趨勢</h2>
+        <div class="ph" style="height:300px;">折線圖（總資產／股票／現金／黃金）</div>
+      </div>
+
+      <!-- 以下自動排成 2~3 欄 -->
+      <div class="card">
+        <h2>📊 配置比例</h2>
+        <div class="ph" style="height:280px;">圓餅圖（前 8 大 + 其他）</div>
+      </div>
+
+      <div class="card">
+        <h2>💵 每月收入</h2>
+        <div class="ph" style="height:280px;">長條圖（主動／被動）</div>
+      </div>
+
+      <div class="card">
+        <h2>📈 股票交易</h2>
+        <div class="ph" style="height:60px;margin-bottom:10px;">代號 / 股數 / 單價</div>
+        <div class="ph" style="height:60px;margin-bottom:10px;">交易預覽（自動算手續費）</div>
+        <div class="ph" style="height:44px;background:#fbc02d;color:#5a4500;">確認交易</div>
+      </div>
+
+      <!-- 持股明細：跨整列（表格適合寬版）-->
+      <div class="card span-all">
+        <h2>📜 持股明細（庫存）</h2>
+        <table>
+          <thead><tr><th>項目</th><th class="r">持有數量</th><th class="r">現值</th><th class="r">損益</th></tr></thead>
+          <tbody>
+            <tr><td>0050</td><td class="r">4,047 股</td><td class="r">$421,495</td><td class="r" style="color:#e91e63;">+12.4%</td></tr>
+            <tr><td>2330</td><td class="r">50 股</td><td class="r">$118,250</td><td class="r" style="color:#e91e63;">+8.1%</td></tr>
+            <tr><td>郵局</td><td class="r">82,156 元</td><td class="r">$82,156</td><td class="r" style="color:#999;">—</td></tr>
+            <tr><td colspan="4" style="text-align:center;color:#bbb;">…其餘持股</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <div class="nav-item"><span>🏠</span>首頁</div>
+    <div class="nav-item"><span>💸</span>記帳</div>
+    <div class="nav-item active"><span>💰</span>資產</div>
+    <div class="nav-item"><span>🍔</span>更多</div>
+  </div>
+</body>
+</html>
