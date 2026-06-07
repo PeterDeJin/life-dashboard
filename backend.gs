@@ -358,3 +358,39 @@ function setupTriggers() {
   ScriptApp.newTrigger('autoLogRecurring').timeBased().everyDays(1).atHour(2).create();   // 每天凌晨 2 點：固定支出自動記帳
   ScriptApp.newTrigger('dailyLogReminder').timeBased().everyDays(1).atHour(22).create();  // 每天 22 點：記帳提醒
 }
+
+// =========================================================
+// 台股即時報價（證交所 MIS API），給 GOOGLEFINANCE 抓不到的股票用
+// 用法：在「即時單價」欄打 =STOCK_NOW(A33)，「昨日收盤」欄打 =STOCK_PREV(A33)
+// 會自動試上市(tse)再試上櫃(otc)
+// =========================================================
+function _twQuoteRaw(code) {
+  code = String(code).trim().replace(/\.\d+$/, '');
+  if (!code) return null;
+  var prefixes = ['tse_', 'otc_'];
+  for (var i = 0; i < prefixes.length; i++) {
+    try {
+      var url = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch=' + prefixes[i] + code + '.tw';
+      var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0' } });
+      var data = JSON.parse(res.getContentText());
+      if (data && data.msgArray && data.msgArray.length) return data.msgArray[0];
+    } catch (e) {}
+  }
+  return null;
+}
+
+// 現價：最新成交價(z)；無成交時退而求其次用最佳買價(b)、再不行用昨收(y)
+function STOCK_NOW(code) {
+  var d = _twQuoteRaw(code); if (!d) return '';
+  var z = parseFloat(d.z); if (!isNaN(z) && z > 0) return z;
+  var b = d.b ? parseFloat(String(d.b).split('_')[0]) : NaN; if (!isNaN(b) && b > 0) return b;
+  var y = parseFloat(d.y); if (!isNaN(y) && y > 0) return y;
+  return '';
+}
+
+// 昨日收盤(y)
+function STOCK_PREV(code) {
+  var d = _twQuoteRaw(code); if (!d) return '';
+  var y = parseFloat(d.y); if (!isNaN(y) && y > 0) return y;
+  return '';
+}
