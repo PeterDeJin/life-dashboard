@@ -426,10 +426,8 @@ function todoReminder() {
 // 一鍵建立排程：在編輯器選這個函數按「執行」一次即可
 // =========================================================
 function setupTriggers() {
-  ScriptApp.getProjectTriggers().forEach(function (t) {
-    var fn = t.getHandlerFunction();
-    if (fn === 'autoLogRecurring' || fn === 'dailyLogReminder' || fn === 'updateBetas' || fn === 'todoReminder') ScriptApp.deleteTrigger(t);
-  });
+  // 清掉所有現有觸發器（含舊版殘留，如 GOLD_REFRESH_ALL）再重建，避免孤兒觸發器一直報錯
+  ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('autoLogRecurring').timeBased().everyDays(1).atHour(2).create();   // 每天凌晨 2 點：固定支出自動記帳
   ScriptApp.newTrigger('dailyLogReminder').timeBased().everyDays(1).atHour(22).create();  // 每天 22 點：記帳提醒
   ScriptApp.newTrigger('todoReminder').timeBased().everyDays(1).atHour(8).create();       // 每天 8 點：待辦提醒
