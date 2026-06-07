@@ -64,6 +64,23 @@
         .dialog-btns button { flex: 1; padding: 12px; border-radius: 10px; font-size: 0.95rem; box-shadow: none; }
         .dialog-cancel { background: #eceff1 !important; color: #555 !important; }
         .dialog-ok { background: #e53935; }
+        /* ===== 深色模式 ===== */
+        body.dark { background: #121212; color: #e0e0e0; }
+        body.dark .card { background: #1e1e1e; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        body.dark .bottom-nav { background: #1e1e1e; border-top-color: #333; }
+        body.dark .nav-item { color: #888; }
+        body.dark .nav-item.active { color: #6fa8ff; }
+        body.dark .quick-btn { background: #2a2a2a !important; color: #ddd !important; border-color: #444 !important; }
+        body.dark input, body.dark select, body.dark textarea { background: #2a2a2a !important; color: #e0e0e0 !important; border-color: #444 !important; }
+        body.dark .dialog-box { background: #1e1e1e; }
+        body.dark .dialog-msg { color: #e0e0e0; }
+        /* 用屬性選擇器壓過 inline 樣式（大量內聯色彩的權宜做法）*/
+        body.dark [style*="color:#333"], body.dark [style*="color: #333"] { color: #ececec !important; }
+        body.dark [style*="color:#555"], body.dark [style*="color:#444"], body.dark [style*="color:#666"] { color: #c2c2c2 !important; }
+        body.dark [style*="color:#888"], body.dark [style*="color:#999"], body.dark [style*="color:#aaa"] { color: #9e9e9e !important; }
+        body.dark [style*="background:#f8f9fa"], body.dark [style*="background:#f9f9f9"], body.dark [style*="background:#f0f0f0"], body.dark [style*="background:#fff3e0"], body.dark [style*="background:#f0f4f8"], body.dark [style*="background:#fff3cd"], body.dark [style*="background:#fce4ec"] { background: #262626 !important; }
+        body.dark [style*="background:white"], body.dark [style*="background:#fff"] { background: #1e1e1e !important; }
+        body.dark [style*="solid #eee"], body.dark [style*="solid #f0f0f0"], body.dark [style*="solid #ddd"] { border-color: #333 !important; }
     </style>
 </head>
 <body>
@@ -295,6 +312,18 @@
 
     <!-- MORE -->
     <div id="view-more" class="view-section">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+            <button id="darkToggle" onclick="toggleDark()" class="quick-btn">🌙 深色模式</button>
+        </div>
+
+        <div class="card full-width" style="border-left:5px solid #009688;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <h2 style="margin:0;">📌 固定支出</h2>
+                <span style="font-size:0.9em;color:#888;">每月共 $<span id="recurringTotal">0</span></span>
+            </div>
+            <div id="recurringContainer" style="display:flex;flex-direction:column;gap:8px;">載入中...</div>
+        </div>
+
         <div class="card full-width" style="border-left:5px solid #2196F3;">
             <h2>💳 帳戶餘額對帳</h2>
             <div id="accountBalanceContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:15px;"><div style="color:#888;">計算中...</div></div>
@@ -366,6 +395,9 @@ if (!sessionStorage.getItem("LOGGED_IN")) {
 // 🟢 全域設定
 // ==========================================
 const API_URL = savedUrl;
+
+// 深色模式：盡早套用，減少開檔閃白
+if (localStorage.getItem('DARK_MODE') === '1') document.body.classList.add('dark');
 
 // ===== 可調設定（預設值；若 Google Sheet 有 Settings 分頁會被覆蓋）=====
 let SAVING_GOAL    = 1500000;  // 第一桶金目標
@@ -493,6 +525,36 @@ function apiPost(payload) {
     return fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) }).then(r => r.text());
 }
 
+// 深色模式切換
+function toggleDark() {
+    const on = document.body.classList.toggle('dark');
+    localStorage.setItem('DARK_MODE', on ? '1' : '0');
+    const b = document.getElementById('darkToggle');
+    if (b) b.textContent = on ? '☀️ 淺色模式' : '🌙 深色模式';
+    toast(on ? '已切換深色模式（圖表配色重開後生效）' : '已切換淺色模式', 'info');
+}
+
+// 固定支出顯示（資料來源：Recurring_DB；實際自動記帳由後端排程做）
+function loadRecurring() {
+    const c = document.getElementById('recurringContainer'); if (!c) return;
+    const totalEl = document.getElementById('recurringTotal');
+    fetchTab('Recurring_DB').then(data => {
+        if (!Array.isArray(data) || !data.length) {
+            c.innerHTML = "<div style='color:#ccc;'>尚未設定（在 Google Sheet 開一個 Recurring_DB 分頁：項目、類別、金額、帳戶、扣款日、啟用）</div>";
+            if (totalEl) totalEl.innerText = "0"; return;
+        }
+        let total = 0;
+        c.innerHTML = data.map(r => {
+            const rawOn = (r['啟用'] !== undefined ? r['啟用'] : 'TRUE');
+            const on = ['TRUE','是','1','Y','YES','ON',''].indexOf(String(rawOn).trim().toUpperCase()) >= 0;
+            const item = esc(fItem(r)), amt = n(r['金額']), day = esc(r['扣款日'] || r['每月幾號'] || ''), acc = esc(r['帳戶'] || ''), cat = esc(fCategory(r));
+            if (on) total += amt;
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:#f8f9fa;border-radius:8px;${on ? '' : 'opacity:0.45;'}"><div><span style="font-weight:bold;color:#333;">${item}</span> <span style="font-size:0.78em;background:#e0f2f1;color:#00695c;padding:2px 6px;border-radius:4px;">每月 ${day} 號</span><br><span style="font-size:0.85em;color:#888;">${cat} · ${acc}${on ? '' : ' · 已停用'}</span></div><div style="font-weight:bold;color:#e91e63;">$${amt.toLocaleString()}</div></div>`;
+        }).join('');
+        if (totalEl) totalEl.innerText = total.toLocaleString();
+    }).catch(() => { c.innerHTML = "<div style='color:#ccc;'>讀取失敗</div>"; });
+}
+
 // ===== 下拉選單自動生成 =====
 function fillSelect(id, opts) {
     const el = document.getElementById(id); if (!el) return;
@@ -582,10 +644,13 @@ window.onload = async function() {
     await Promise.all([
         fetchTab('Habit_Log'), fetchTab('Asset_Log'), fetchTab('Expenses_DB'),
         fetchTab('Portfolio'),  fetchTab('History_Log'), fetchTab('Media_Log'),
-        fetchTab('Events_DB'),  fetchTab('Wishlist_DB'), fetchTab('Settings')
+        fetchTab('Events_DB'),  fetchTab('Wishlist_DB'), fetchTab('Settings'),
+        fetchTab('Recurring_DB')
     ]).catch(e => console.warn("部分資料載入失敗:", e));
 
     await loadSettings(); // 覆蓋目標/預算（需在繪圖前）
+
+    if (document.body.classList.contains('dark')) Chart.defaults.color = '#bbb'; // 深色模式圖表文字
 
     loadChart();
     loadAssetChart();
@@ -596,6 +661,11 @@ window.onload = async function() {
     loadTrendChart();
     loadMediaList();
     loadTimeWidget();
+    loadRecurring();
+
+    // 同步深色切換鈕文字
+    const darkBtn = document.getElementById('darkToggle');
+    if (darkBtn && document.body.classList.contains('dark')) darkBtn.textContent = '☀️ 淺色模式';
 };
 
 // ==========================================

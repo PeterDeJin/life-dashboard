@@ -212,3 +212,149 @@ function GOLD_PREV() {
     return daily.length ? daily[0].buy : '';
   } catch (e) { return ''; }
 }
+
+// =========================================================
+// Bark 推播
+// 需先到「專案設定 → 指令碼屬性」新增一個屬性：
+//   名稱 BARK_KEY，值＝你的 Bark key（多個用逗號分隔）
+// =========================================================
+function _bark(title, body) {
+  var key = PropertiesService.getScriptProperties().getProperty('BARK_KEY');
+  if (!key) return;
+  key.split(',').forEach(function (k) {
+    k = k.trim(); if (!k) return;
+    var url = 'https://api.day.app/' + k + '/' + encodeURIComponent(title) + '/' + encodeURIComponent(body) + '?group=Dashboard';
+    try { UrlFetchApp.fetch(url, { muteHttpExceptions: true }); } catch (e) {}
+  });
+}
+
+// 找某分頁某些標題對應的欄位 index（容錯）
+function _colIndex(headers, names) {
+  for (var i = 0; i < headers.length; i++) {
+    if (names.indexOf(String(headers[i]).trim()) >= 0) return i;
+  }
+  return -1;
+}
+
+// =========================================================
+// 智慧記帳提醒（每天 22:00 觸發）：當天還沒記任何一筆才推播
+// =========================================================
+function dailyLogReminder() {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Expenses_DB');
+    if (!sheet) return;
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) { _bark('記帳提醒', '今天還沒記帳，回家記一下吧'); return; }
+
+    var dateIdx = _colIndex(data[0], ['日期']); if (dateIdx < 0) dateIdx = 0;
+    var today = Utilities.formatDate(new Date(), 'GMT+8', 'yyyy/MM/dd');
+
+    var logged = false;
+    for (var i = data.length - 1; i >= 1 && i >= data.length - 80; i--) { // 看最後 ~80 筆就夠
+      var d = data[i][dateIdx];
+      var ds = (d instanceof Date) ? Utilities.formatDate(d, 'GMT+8', 'yyyy/MM/dd') : String(d).replace(/-/g, '/').trim();
+      if (ds === today) { logged = true; break; }
+    }
+    if (!logged) _bark('記帳提醒', '今天還沒記帳，回家記一下吧');
+  } catch (e) {}
+}
+
+// =========================================================
+// 固定支出自動記帳（每天觸發）：到扣款日就寫一筆進 Expenses_DB
+// 需要一個 Recurring_DB 分頁：項目、類別、金額、帳戶、扣款日、啟用
+// =========================================================
+function autoLogRecurring() {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(20000); } catch (e) { return; }
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var rSheet = ss.getSheetByName('Recurring_DB');
+    var eSheet = ss.getSheetByName('Expenses_DB');
+    if (!rSheet || !eSheet) return;
+
+    var rData = rSheet.getDataRange().getValues();
+    if (rData.length < 2) return;
+    var rH = rData[0];
+    var ci = {
+      item: _colIndex(rH, ['項目', '項目名稱']),
+      cat:  _colIndex(rH, ['類別']),
+      amt:  _colIndex(rH, ['金額']),
+      acc:  _colIndex(rH, ['帳戶']),
+      day:  _colIndex(rH, ['扣款日', '每月幾號', '日']),
+      on:   _colIndex(rH, ['啟用', '是否啟用'])
+    };
+    if (ci.item < 0 || ci.amt < 0 || ci.day < 0) return;
+
+    var now = new Date();
+    var todayDay = Number(Utilities.formatDate(now, 'GMT+8', 'd'));
+    var lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    var ym = Utilities.formatDate(now, 'GMT+8', 'yyyy/MM');
+    var todayStr = Utilities.formatDate(now, 'GMT+8', 'yyyy/MM/dd');
+
+    // 本月已記過的項目（避免重複）
+    var eData = eSheet.getDataRange().getValues();
+    var eH = eData[0];
+    var eItem = _colIndex(eH, ['項目', '項目名稱']);
+    var eDate = _colIndex(eH, ['日期']); if (eDate < 0) eDate = 0;
+    var done = {};
+    for (var i = 1; i < eData.length; i++) {
+      var d = eData[i][eDate];
+      var mk = (d instanceof Date) ? Utilities.formatDate(d, 'GMT+8', 'yyyy/MM') : String(d).replace(/-/g, '/').slice(0, 7);
+      if (mk === ym) done[String(eData[i][eItem]).trim()] = true;
+    }
+
+    function isOn(v) {
+      if (ci.on < 0) return true;
+      v = String(v).trim().toUpperCase();
+      return v === 'TRUE' || v === '是' || v === '1' || v === 'Y' || v === 'YES' || v === 'ON' || v === '';
+    }
+
+    var schema = SCHEMAS['Expenses_DB'];
+    var headers = getHeaders(eSheet);
+    var width = headers.length || schema.length;
+    var newRows = [], notify = [];
+
+    for (var r = 1; r < rData.length; r++) {
+      var row = rData[r];
+      if (!isOn(row[ci.on])) continue;
+      var item = String(row[ci.item] || '').trim();
+      if (!item) continue;
+      var due = Number(row[ci.day]); if (!due) continue;
+      if (todayDay !== Math.min(due, lastDay)) continue; // 31 號遇到短月→當月最後一天
+      if (done[item]) continue;
+
+      var amt = Number(String(row[ci.amt]).replace(/,/g, '')) || 0;
+      newRows.push(buildRowByHeader(headers, schema, {
+        date: todayStr,
+        category: ci.cat < 0 ? '其他' : (row[ci.cat] || '其他'),
+        item: item,
+        amount: amt,
+        account: ci.acc < 0 ? '' : (row[ci.acc] || ''),
+        type: '支出'
+      }));
+      notify.push(item + ' $' + amt);
+      done[item] = true;
+    }
+
+    if (newRows.length) {
+      eSheet.getRange(eSheet.getLastRow() + 1, 1, newRows.length, width).setValues(newRows);
+      _bark('已自動記帳', notify.join('、'));
+    }
+  } catch (e) {
+    _bark('自動記帳失敗', String(e));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// =========================================================
+// 一鍵建立排程：在編輯器選這個函數按「執行」一次即可
+// =========================================================
+function setupTriggers() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    var fn = t.getHandlerFunction();
+    if (fn === 'autoLogRecurring' || fn === 'dailyLogReminder') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('autoLogRecurring').timeBased().everyDays(1).atHour(2).create();   // 每天凌晨 2 點：固定支出自動記帳
+  ScriptApp.newTrigger('dailyLogReminder').timeBased().everyDays(1).atHour(22).create();  // 每天 22 點：記帳提醒
+}
