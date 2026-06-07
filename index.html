@@ -7,6 +7,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#f4f7f6">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-title" content="Dashboard">
     <title>My Life Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
@@ -1267,6 +1269,15 @@ async function deleteExpense(date,item,amount,btn){
         } else if(data.includes("NotFound")){toast("❌ 找不到此紀錄（僅能刪除最近 30 筆）",'error');btn.innerText="🗑️";btn.disabled=false;}
         else{toast("失敗："+data,'error');btn.innerText="🗑️";btn.disabled=false;}
     }).catch(()=>{toast("連線錯誤，請重試",'error');btn.innerText="🗑️";btn.disabled=false;});
+}
+
+// ==========================================
+// 📲 PWA：註冊 Service Worker（離線可用 + 可安裝到桌面）
+// ==========================================
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    });
 }
 </script>
 </body>
