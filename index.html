@@ -135,9 +135,43 @@
         </div>
         </div>
 
+        <div class="row2">
+        <div class="card" style="border-left:5px solid #3f51b5;">
+            <h2>✅ 待辦事項</h2>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+                <input type="text" id="todoTitle" placeholder="要做什麼？" style="padding:10px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;">
+                <div style="display:flex;gap:8px;">
+                    <input type="date" id="todoDue" style="flex:1;padding:10px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;">
+                    <select id="todoPriority" style="flex:1;padding:10px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;"><option value="高">🔴 高</option><option value="中" selected>🟡 中</option><option value="低">🟢 低</option></select>
+                </div>
+                <button onclick="submitTodo(this)" style="background:#3f51b5;width:100%;">新增</button>
+            </div>
+            <div id="todoList" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;">載入中...</div>
+        </div>
+
+        <div class="card" style="border-left:5px solid #ec407a;">
+            <h2>📔 心情日記</h2>
+            <div id="moodPicker" style="display:flex;gap:6px;justify-content:space-between;margin:8px 0 12px;">
+                <button class="mood-btn" data-m="1" style="font-size:1.7rem;background:none;box-shadow:none;padding:4px;opacity:0.45;">😢</button>
+                <button class="mood-btn" data-m="2" style="font-size:1.7rem;background:none;box-shadow:none;padding:4px;opacity:0.45;">😕</button>
+                <button class="mood-btn" data-m="3" style="font-size:1.7rem;background:none;box-shadow:none;padding:4px;opacity:0.45;">😐</button>
+                <button class="mood-btn" data-m="4" style="font-size:1.7rem;background:none;box-shadow:none;padding:4px;opacity:0.45;">🙂</button>
+                <button class="mood-btn" data-m="5" style="font-size:1.7rem;background:none;box-shadow:none;padding:4px;opacity:0.45;">😄</button>
+            </div>
+            <input type="text" id="moodNote" placeholder="今天一句話…" style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;">
+            <button onclick="submitMood(this)" style="background:#ec407a;width:100%;margin-top:10px;">記錄今天</button>
+            <div id="moodRecent" style="margin-top:12px;display:flex;flex-direction:column;gap:6px;max-height:150px;overflow-y:auto;"></div>
+        </div>
+        </div>
+
         <div class="card">
             <h2>📈 能力成長曲線</h2>
             <canvas id="habitChart"></canvas>
+        </div>
+
+        <div class="card">
+            <h2>📈 心情曲線</h2>
+            <div style="height:240px;"><canvas id="moodChart"></canvas></div>
         </div>
       </div>
     </div>
@@ -458,7 +492,7 @@ const OPTIONS = {
 Chart.register(ChartDataLabels);
 Chart.defaults.set('plugins.datalabels', { display: false });
 
-let myChart=null, assetChart=null, incomeChart=null, compareChart=null, trendChart=null;
+let myChart=null, assetChart=null, incomeChart=null, compareChart=null, trendChart=null, moodChart=null;
 let globalSnapshotData=[], globalTotalAssets=0, globalLivingFunds=0, globalExpensesData=[];
 let expShowCount=20; // 記帳列表目前顯示筆數（「載入更多」會增加）
 let editingExpenseId=null; // 記帳編輯模式：非 null 表示正在編輯該筆 ID
@@ -592,6 +626,93 @@ function loadRecurring() {
     }).catch(() => { c.innerHTML = "<div style='color:#ccc;'>讀取失敗</div>"; });
 }
 
+// ========== 待辦事項 ==========
+const PRIO_RANK = { '高':0, '中':1, '低':2 };
+function _isDone(v){ return ['TRUE','是','1','Y','YES','V','✓','DONE','ON'].indexOf(String(v).trim().toUpperCase()) >= 0; }
+function submitTodo(btn){
+    const title = document.getElementById('todoTitle').value.trim();
+    if(!title){ toast("請輸入任務",'error'); return; }
+    const due = document.getElementById('todoDue').value, prio = document.getElementById('todoPriority').value;
+    btn.disabled=true;
+    apiPost({tab:"Todo_DB",title,due,priority:prio,done:false,id:newId()}).then(d=>{
+        if(d.includes("Success")){ toast("✅ 已新增",'success'); document.getElementById('todoTitle').value=""; document.getElementById('todoDue').value=""; invalidateCache('Todo_DB'); loadTodos(); }
+        else toast("失敗："+d,'error');
+        btn.disabled=false;
+    }).catch(()=>{ toast("連線錯誤，請重試",'error'); btn.disabled=false; });
+}
+function loadTodos(){
+    const c=document.getElementById('todoList'); if(!c) return;
+    fetchTab('Todo_DB').then(data=>{
+        if(!Array.isArray(data)){ c.innerHTML="<div style='color:#ccc;font-size:0.85em;'>尚未設定（請在 Sheet 開 Todo_DB 分頁：任務、截止日、優先、完成、ID）</div>"; return; }
+        let items=data.filter(r=>!_isDone(r.完成) && String(r.任務||r.項目||"").trim());
+        const today=new Date(); today.setHours(0,0,0,0);
+        const ts=r=>{ if(!r.截止日) return Infinity; let d=new Date(String(r.截止日).replace(/\//g,'-')); return isNaN(d)?Infinity:d.getTime(); };
+        items.sort((a,b)=>{ let d=ts(a)-ts(b); if(d!==0) return d; let pa=PRIO_RANK[a.優先]!==undefined?PRIO_RANK[a.優先]:1, pb=PRIO_RANK[b.優先]!==undefined?PRIO_RANK[b.優先]:1; return pa-pb; });
+        if(!items.length){ c.innerHTML="<div style='color:#bbb;text-align:center;padding:12px;'>沒有待辦，讚 🎉</div>"; return; }
+        c.innerHTML=items.map(r=>{
+            const id=esc(r.ID!==undefined?r.ID:""), title=esc(r.任務||r.項目||"");
+            const prio=String(r.優先||"中"), dot=prio==="高"?"🔴":prio==="低"?"🟢":"🟡";
+            let dueTxt="";
+            if(r.截止日){ let dd=new Date(String(r.截止日).replace(/\//g,'-')); if(!isNaN(dd)){ let diff=Math.round((dd-today)/86400000); let col=diff<0?"#e53935":diff===0?"#fb8c00":"#888"; let t=diff<0?`逾期 ${-diff} 天`:diff===0?"今天到期":`還有 ${diff} 天`; dueTxt=`<br><span style="font-size:0.8em;color:${col};">${esc(formatDate(r.截止日))}・${t}</span>`; } }
+            return `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f9fa;border-radius:8px;"><span class="todo-check" data-id="${id}" style="cursor:pointer;font-size:1.2em;">⬜</span><div style="flex:1;color:#333;">${dot} ${title}${dueTxt}</div><button class="todo-del" data-id="${id}" style="background:#ffebee;color:#c62828;padding:4px 8px;font-size:0.8rem;border-radius:5px;box-shadow:none;border:1px solid #ffcdd2;">🗑️</button></div>`;
+        }).join('');
+    }).catch(()=>{ c.innerHTML="<div style='color:#ccc;'>讀取失敗</div>"; });
+}
+function toggleTodoDone(id, el){
+    el.textContent="⏳";
+    apiPost({action:"update",tab:"Todo_DB",id,done:true}).then(d=>{
+        if(d.includes("Updated")){ toast("完成 ✅",'success'); invalidateCache('Todo_DB'); loadTodos(); }
+        else{ toast("失敗："+d,'error'); el.textContent="⬜"; }
+    }).catch(()=>{ toast("連線錯誤",'error'); el.textContent="⬜"; });
+}
+function deleteTodo(id, btn){
+    btn.innerText="⏳"; btn.disabled=true;
+    apiPost({action:"delete",tab:"Todo_DB",id}).then(d=>{
+        if(d.includes("Deleted")){ invalidateCache('Todo_DB'); loadTodos(); }
+        else{ toast("刪除失敗："+d,'error'); btn.innerText="🗑️"; btn.disabled=false; }
+    }).catch(()=>{ toast("連線錯誤",'error'); btn.innerText="🗑️"; btn.disabled=false; });
+}
+
+// ========== 心情日記 ==========
+const MOOD_EMOJI = { 1:'😢', 2:'😕', 3:'😐', 4:'🙂', 5:'😄' };
+let selectedMood = 4;
+function highlightMood(){
+    const p=document.getElementById('moodPicker'); if(!p) return;
+    p.querySelectorAll('.mood-btn').forEach(x=>{ const on=x.dataset.m===String(selectedMood); x.style.opacity=on?'1':'0.45'; x.style.transform=on?'scale(1.3)':'scale(1)'; });
+}
+function setupMoodPicker(){
+    const p=document.getElementById('moodPicker'); if(!p) return;
+    p.addEventListener('click', e=>{ const b=e.target.closest('.mood-btn'); if(!b) return; selectedMood=Number(b.dataset.m); highlightMood(); });
+    highlightMood();
+}
+function submitMood(btn){
+    const note=document.getElementById('moodNote').value.trim();
+    btn.disabled=true;
+    const today=new Date().toISOString().split('T')[0];
+    apiPost({tab:"Mood_DB",date:today,mood:selectedMood,note,id:newId()}).then(d=>{
+        if(d.includes("Success")){ toast("📔 已記錄今天",'success'); document.getElementById('moodNote').value=""; invalidateCache('Mood_DB'); loadMood(); }
+        else toast("失敗："+d,'error');
+        btn.disabled=false;
+    }).catch(()=>{ toast("連線錯誤，請重試",'error'); btn.disabled=false; });
+}
+function loadMood(){
+    fetchTab('Mood_DB').then(data=>{
+        const recent=document.getElementById('moodRecent');
+        if(!Array.isArray(data)||!data.length){ if(recent) recent.innerHTML="<div style='color:#ccc;font-size:0.85em;'>還沒有日記（請在 Sheet 開 Mood_DB 分頁：日期、心情、內容、ID）</div>"; return; }
+        if(recent){
+            recent.innerHTML=data.slice(-5).reverse().map(r=>{
+                let m=Number(r.心情||r.分數||0), e=MOOD_EMOJI[m]||"";
+                return `<div style="font-size:0.85em;display:flex;gap:6px;align-items:baseline;"><span>${e}</span><span style="color:#999;">${esc(formatDate(r.日期))}</span><span style="flex:1;color:#555;">${esc(r.內容||r.日記||"")}</span></div>`;
+            }).join('');
+        }
+        let byDate={}; data.forEach(r=>{ let k=formatDate(r.日期), m=Number(r.心情||r.分數); if(k&&!isNaN(m)&&m>0) byDate[k]=m; });
+        let keys=Object.keys(byDate).sort((a,b)=>new Date(a.replace(/\//g,'-'))-new Date(b.replace(/\//g,'-'))).slice(-30);
+        const ctx=document.getElementById('moodChart'); if(!ctx) return;
+        if(moodChart) moodChart.destroy();
+        moodChart=new Chart(ctx,{type:'line',data:{labels:keys,datasets:[{label:'心情',data:keys.map(k=>byDate[k]),borderColor:'#ec407a',backgroundColor:'rgba(236,64,122,0.15)',fill:true,tension:0.35,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{min:1,max:5,ticks:{stepSize:1,callback:v=>MOOD_EMOJI[v]||v}}},plugins:{legend:{display:false}}}});
+    }).catch(()=>{});
+}
+
 // ===== 下拉選單自動生成 =====
 function fillSelect(id, opts) {
     const el = document.getElementById(id); if (!el) return;
@@ -653,6 +774,12 @@ function setupDelegation() {
         const del = e.target.closest('.del-wish');
         if (del) { deleteWish(del.dataset.d, del.dataset.i, del.dataset.a, del, del.dataset.id); }
     });
+    const todoC = document.getElementById('todoList');
+    if (todoC) todoC.addEventListener('click', e => {
+        const ck = e.target.closest('.todo-check'); if (ck) { toggleTodoDone(ck.dataset.id, ck); return; }
+        const dl = e.target.closest('.todo-del'); if (dl) { deleteTodo(dl.dataset.id, dl); }
+    });
+    setupMoodPicker();
 }
 
 // ==========================================
@@ -683,7 +810,7 @@ window.onload = async function() {
         fetchTab('Habit_Log'), fetchTab('Asset_Log'), fetchTab('Expenses_DB'),
         fetchTab('Portfolio'),  fetchTab('History_Log'), fetchTab('Media_Log'),
         fetchTab('Events_DB'),  fetchTab('Wishlist_DB'), fetchTab('Settings'),
-        fetchTab('Recurring_DB')
+        fetchTab('Recurring_DB'), fetchTab('Todo_DB'), fetchTab('Mood_DB')
     ]).catch(e => console.warn("部分資料載入失敗:", e));
 
     await loadSettings(); // 覆蓋目標/預算（需在繪圖前）
@@ -700,6 +827,8 @@ window.onload = async function() {
     loadMediaList();
     loadTimeWidget();
     loadRecurring();
+    loadTodos();
+    loadMood();
 
     applyDarkMode(); // 同步深色狀態與按鈕文字
 };

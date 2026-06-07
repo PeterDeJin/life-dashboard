@@ -10,7 +10,9 @@ var SCHEMAS = {
   Expenses_DB: [['date',['日期']],['category',['類別']],['item',['項目','項目名稱']],['amount',['金額']],['account',['帳戶']],['type',['收支']],['id',['ID']]],
   Media_Log:   [['date',['日期']],['type',['類別']],['title',['標題']],['rating',['評分']],['comment',['心得']]],
   Events_DB:   [['title',['事件名稱']],['date',['日期']],['type',['類型']]],
-  Wishlist_DB: [['date',['日期']],['item',['項目名稱','項目']],['amount',['預估金額','金額']],['note',['連結/備註','連結','備註']],['id',['ID']]]
+  Wishlist_DB: [['date',['日期']],['item',['項目名稱','項目']],['amount',['預估金額','金額']],['note',['連結/備註','連結','備註']],['id',['ID']]],
+  Todo_DB:     [['title',['任務','項目','標題']],['due',['截止日','日期']],['priority',['優先','優先序']],['done',['完成']],['id',['ID']]],
+  Mood_DB:     [['date',['日期']],['mood',['心情','分數','評分']],['note',['內容','日記','心得','備註']],['id',['ID']]]
 };
 
 function out(s)     { return ContentService.createTextOutput(s); }
