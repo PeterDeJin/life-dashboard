@@ -531,7 +531,14 @@ function fetchTab(tab) {
     if (_cache[tab]) return Promise.resolve(_cache[tab]);
     return fetch(API_URL + "?tab=" + tab)
         .then(r => r.json())
-        .then(data => { _cache[tab] = data; return data; });
+        .then(data => {
+            // 自動去除欄位名前後空白，避免標題多打空格導致讀不到
+            if (Array.isArray(data)) data = data.map(row => {
+                if (row && typeof row === 'object') { const o = {}; for (const k in row) o[String(k).trim()] = row[k]; return o; }
+                return row;
+            });
+            _cache[tab] = data; return data;
+        });
 }
 
 function invalidateCache(...tabs) { tabs.forEach(t => delete _cache[t]); }
