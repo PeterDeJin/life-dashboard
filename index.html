@@ -139,13 +139,13 @@
         <div class="card">
             <h2>💸 日常記帳</h2>
             <div style="margin-bottom:15px;">
-                <div style="font-size:0.85em;color:#888;margin-bottom:8px;">⚡ 快速帶入：</div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <button class="quick-btn" onclick="quickFill('午餐','食',80,'錢包')">🍱 午餐 $80</button>
-                    <button class="quick-btn" onclick="quickFill('早餐','食',50,'錢包')">☕ 早餐 $50</button>
-                    <button class="quick-btn" onclick="quickFill('晚餐','食',100,'錢包')">🍜 晚餐 $100</button>
-                    <button class="quick-btn" onclick="quickFill('捷運','行',30,'悠遊卡')">🚇 捷運 $30</button>
-                    <button class="quick-btn" onclick="quickFill('飲料','食',45,'錢包')">🧋 飲料 $45</button>
+                <div style="font-size:0.85em;color:#888;margin-bottom:8px;">⚡ 快速帶入（依你最常記的自動排序）：</div>
+                <div id="quickFillBox" style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="quick-btn" data-item="午餐" data-cat="食" data-amt="80" data-acc="錢包">🍱 午餐 $80</button>
+                    <button class="quick-btn" data-item="早餐" data-cat="食" data-amt="50" data-acc="錢包">☕ 早餐 $50</button>
+                    <button class="quick-btn" data-item="晚餐" data-cat="食" data-amt="100" data-acc="錢包">🍜 晚餐 $100</button>
+                    <button class="quick-btn" data-item="捷運" data-cat="行" data-amt="30" data-acc="悠遊卡">🚇 捷運 $30</button>
+                    <button class="quick-btn" data-item="飲料" data-cat="食" data-amt="45" data-acc="錢包">🧋 飲料 $45</button>
                 </div>
             </div>
             <div class="asset-form">
@@ -533,6 +533,11 @@ async function loadSettings() {
 
 // ===== 列表按鈕事件委派（取代 inline onclick，杜絕注入）=====
 function setupDelegation() {
+    const qf = document.getElementById('quickFillBox');
+    if (qf) qf.addEventListener('click', e => {
+        const b = e.target.closest('.quick-btn'); if (!b) return;
+        quickFill(b.dataset.item, b.dataset.cat, b.dataset.amt, b.dataset.acc);
+    });
     const expList = document.getElementById('expenseList');
     if (expList) expList.addEventListener('click', e => {
         if (e.target.closest('.more-exp')) { expShowCount += 20; renderExpenseList(); return; }
@@ -889,7 +894,7 @@ function submitExpense() {
     }).catch(() => { toast("連線錯誤，請重試", 'error'); reset(); });
 }
 
-// 新增：快速帶入
+// 快速帶入
 function quickFill(item,category,amount,account){
     document.getElementById('expItem').value=item;
     document.getElementById('expCategory').value=category;
@@ -899,9 +904,35 @@ function quickFill(item,category,amount,account){
     document.getElementById('expAmount').focus();
 }
 
+// 動態常用項目：依歷史記帳頻率排序，並帶入每個項目「最近一次」的類別/帳戶/金額
+const CAT_EMOJI = {食:'🍱',衣:'👕',住:'🏠',行:'🚆',育樂:'🎮',其他:'🛒'};
+function renderQuickButtons(){
+    const box=document.getElementById('quickFillBox');
+    if(!box) return;
+    const data=(globalExpensesData||[]).filter(r=>r.收支==='支出');
+    if(!data.length) return; // 沒有歷史就保留預設按鈕
+    const stat={}; // 項目名 -> {count, item, category, account, amount}
+    data.forEach(r=>{
+        const item=String(fItem(r)).trim();
+        if(!item) return;
+        if(!stat[item]) stat[item]={count:0,item,category:'其他',account:'錢包',amount:0};
+        stat[item].count++;
+        // 依時間順序覆蓋 → 最後留下的就是「最近一次」
+        stat[item].category=fCategory(r)||stat[item].category;
+        stat[item].account=r.帳戶||stat[item].account;
+        stat[item].amount=n(r.金額)||stat[item].amount;
+    });
+    const top=Object.values(stat).sort((a,b)=>b.count-a.count).slice(0,8);
+    if(!top.length) return;
+    box.innerHTML=top.map(s=>{
+        const emoji=CAT_EMOJI[s.category]||'🛒';
+        return `<button class="quick-btn" data-item="${esc(s.item)}" data-cat="${esc(s.category)}" data-amt="${esc(s.amount)}" data-acc="${esc(s.account)}">${emoji} ${esc(s.item)} $${n(s.amount).toLocaleString()}</button>`;
+    }).join('');
+}
+
 // 功能 6：讀取記帳列表
 function loadExpenses() {
-    fetchTab('Expenses_DB').then(data => { globalExpensesData=data; renderExpenseList(); });
+    fetchTab('Expenses_DB').then(data => { globalExpensesData=data; renderExpenseList(); renderQuickButtons(); });
 }
 
 function renderExpenseList() {
