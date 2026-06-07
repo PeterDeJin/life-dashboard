@@ -18,7 +18,7 @@
         .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 0; }
         /* 版面排版：整列堆疊 / 兩欄 / 三欄；窄螢幕一律單欄 */
         .stack { display: flex; flex-direction: column; gap: 20px; }
-        .row2, .row3 { display: grid; gap: 20px; align-items: start; }
+        .row2, .row3 { display: grid; gap: 20px; align-items: stretch; }
         .row2 { grid-template-columns: 1fr 1fr; }
         .row3 { grid-template-columns: 1fr 1fr 1fr; }
         @media (max-width: 820px) { .row2, .row3 { grid-template-columns: 1fr; } }
@@ -335,7 +335,6 @@
         </div>
 
       <div class="stack">
-        <div class="row2">
         <div class="card full-width" style="border-left:5px solid #009688;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                 <h2 style="margin:0;">📌 固定支出</h2>
@@ -348,9 +347,7 @@
             <h2>💳 帳戶餘額對帳</h2>
             <div id="accountBalanceContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:15px;"><div style="color:#888;">計算中...</div></div>
         </div>
-        </div>
 
-        <div class="row2">
         <div class="card full-width" style="border-left:5px solid #ff9800;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
                 <h2>🛍️ 夢想購物車</h2>
@@ -379,7 +376,6 @@
                 <button onclick="submitMedia(this)" style="background:#607d8b;color:white;">儲存</button>
             </div>
             <div id="mediaContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:15px;">載入中...</div>
-        </div>
         </div>
       </div>
     </div>
@@ -420,8 +416,8 @@ if (!sessionStorage.getItem("LOGGED_IN")) {
 // ==========================================
 const API_URL = savedUrl;
 
-// 深色模式：盡早套用，減少開檔閃白
-if (localStorage.getItem('DARK_MODE') === '1') document.body.classList.add('dark');
+// 深色模式：盡早套用（支援「自動跟時間」）
+applyDarkMode();
 
 // ===== 可調設定（預設值；若 Google Sheet 有 Settings 分頁會被覆蓋）=====
 let SAVING_GOAL    = 1500000;  // 第一桶金目標
@@ -549,14 +545,29 @@ function apiPost(payload) {
     return fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) }).then(r => r.text());
 }
 
-// 深色模式切換
-function toggleDark() {
-    const on = document.body.classList.toggle('dark');
-    localStorage.setItem('DARK_MODE', on ? '1' : '0');
-    const b = document.getElementById('darkToggle');
-    if (b) b.textContent = on ? '☀️ 淺色模式' : '🌙 深色模式';
-    toast(on ? '已切換深色模式（圖表配色重開後生效）' : '已切換淺色模式', 'info');
+// 深色模式：自動（跟時間）/ 淺色 / 深色 三段
+function isNightDark() { var h = new Date().getHours(); return h >= 18 || h < 6; } // 18:00–06:00 視為深色時段
+function darkModeSetting() {
+    var m = localStorage.getItem('DARK_MODE');
+    if (m === '1') return 'dark'; if (m === '0') return 'light'; // 舊值相容
+    return m || 'auto';
 }
+function applyDarkMode() {
+    var m = darkModeSetting();
+    var dark = (m === 'dark') || (m === 'auto' && isNightDark());
+    document.body.classList.toggle('dark', dark);
+    var b = document.getElementById('darkToggle');
+    if (b) b.textContent = m === 'auto' ? '🌓 自動' : (m === 'light' ? '☀️ 淺色' : '🌙 深色');
+}
+function toggleDark() {
+    var order = ['auto', 'light', 'dark'];
+    var next = order[(order.indexOf(darkModeSetting()) + 1) % order.length];
+    localStorage.setItem('DARK_MODE', next);
+    applyDarkMode();
+    toast(next === 'auto' ? '深色模式：自動（跟時間）' : next === 'light' ? '深色模式：淺色' : '深色模式：深色', 'info');
+}
+// 回到 App / 跨過日夜時段時，自動重新判斷
+document.addEventListener('visibilitychange', function () { if (!document.hidden) applyDarkMode(); });
 
 // 固定支出顯示（資料來源：Recurring_DB；實際自動記帳由後端排程做）
 function loadRecurring() {
@@ -687,9 +698,7 @@ window.onload = async function() {
     loadTimeWidget();
     loadRecurring();
 
-    // 同步深色切換鈕文字
-    const darkBtn = document.getElementById('darkToggle');
-    if (darkBtn && document.body.classList.contains('dark')) darkBtn.textContent = '☀️ 淺色模式';
+    applyDarkMode(); // 同步深色狀態與按鈕文字
 };
 
 // ==========================================
