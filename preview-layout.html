@@ -8,10 +8,11 @@
   body { font-family:'微軟正黑體',sans-serif; background:#f4f7f6; margin:0; padding:15px 15px 80px; -webkit-font-smoothing:antialiased; }
   .container { max-width:1200px; width:100%; margin:0 auto; }
   h1 { text-align:center; margin:6px 0 4px; }
-  .pagetag { text-align:center; color:#2a5298; font-weight:bold; margin:34px 0 14px; font-size:1.05rem; letter-spacing:2px; }
-  .layout { display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:20px; align-items:start; }
-  .span-all { grid-column:1 / -1; }
-  .card { background:#fff; padding:20px; border-radius:15px; box-shadow:0 4px 12px rgba(0,0,0,0.08); box-sizing:border-box; }
+  .pagetag { text-align:center; color:#2a5298; font-weight:bold; margin:30px 0 14px; font-size:1.05rem; letter-spacing:2px; }
+  /* 瀑布流：卡片往上塞滿、不留空格；窄螢幕自動收成單欄 */
+  .layout { columns:480px; column-gap:20px; }
+  .card { break-inside:avoid; margin:0 0 20px; background:#fff; padding:20px; border-radius:15px; box-shadow:0 4px 12px rgba(0,0,0,0.08); box-sizing:border-box; }
+  .span-all { column-span:all; }
   .card h2 { margin:0 0 12px; font-size:1.15rem; }
   .ph { background:repeating-linear-gradient(45deg,#f0f2f5,#f0f2f5 10px,#e9edf1 10px,#e9edf1 20px); border-radius:10px; display:flex; align-items:center; justify-content:center; color:#9aa3ad; font-size:0.9rem; }
   table { width:100%; border-collapse:collapse; font-size:0.9em; }
@@ -27,7 +28,7 @@
 </style>
 </head>
 <body>
-  <div class="note">版面示意（假資料）。桌機多欄填滿、頁面變短；視窗拉窄會自動收成單欄（手機就是單欄）。下面同時放了「資產」和「記帳」兩頁的版型。</div>
+  <div class="note">版面示意（假資料）。改用瀑布流兩欄：卡片往上塞滿、不再留空格；視窗拉窄會自動收成單欄（手機就是單欄）。</div>
   <div class="container">
     <h1>🚀 My Life Dashboard</h1>
 
@@ -35,7 +36,6 @@
     <div class="pagetag">— 資產 —</div>
     <div class="layout">
 
-      <!-- 英雄卡：內容撐滿整張卡 -->
       <div class="card span-all" style="background:linear-gradient(135deg,#1e3c72,#2a5298);color:#fff;padding:26px 32px;">
         <div style="text-align:center;font-size:1.1rem;opacity:0.85;">💰 總資產淨值</div>
         <div style="text-align:center;font-size:3.4rem;font-weight:bold;margin:6px 0 16px;">$1,331,102</div>
@@ -56,6 +56,14 @@
 
       <div class="card"><h2>📊 配置比例</h2><div class="ph" style="height:280px;">圓餅圖（前 8 大 + 其他）</div></div>
       <div class="card"><h2>💵 每月收入</h2><div class="ph" style="height:280px;">長條圖（主動／被動）</div></div>
+      <div class="card">
+        <h2>📈 股票交易</h2>
+        <div class="field">代號 / 交易別</div>
+        <div class="field">股數</div>
+        <div class="field">成交單價</div>
+        <div class="field">手續費（自動）</div>
+        <div class="btn" style="background:#fbc02d;color:#5a4500;">確認交易</div>
+      </div>
 
       <div class="card span-all">
         <h2>📜 持股明細（庫存）</h2>
@@ -68,15 +76,6 @@
             <tr><td colspan="4" style="text-align:center;color:#bbb;">…其餘持股</td></tr>
           </tbody>
         </table>
-      </div>
-
-      <div class="card span-all">
-        <h2>📈 股票交易</h2>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
-          <div class="field">代號 / 交易別</div><div class="field">股數</div>
-          <div class="field">成交單價</div><div class="field">手續費（自動）</div>
-        </div>
-        <div class="btn" style="background:#fbc02d;color:#5a4500;margin-top:6px;">確認交易</div>
       </div>
 
     </div>
