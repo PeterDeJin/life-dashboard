@@ -14,8 +14,14 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <style>
         body { font-family: '微軟正黑體', sans-serif; background: #f4f7f6; padding: 15px; display: flex; flex-direction: column; align-items: center; -webkit-user-select: none; user-select: none; margin: 0; padding-bottom: 80px; }
-        .container { max-width: 800px; width: 100%; }
-        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .container { max-width: 1200px; width: 100%; }
+        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 0; }
+        /* 版面排版：整列堆疊 / 兩欄 / 三欄；窄螢幕一律單欄 */
+        .stack { display: flex; flex-direction: column; gap: 20px; }
+        .row2, .row3 { display: grid; gap: 20px; align-items: start; }
+        .row2 { grid-template-columns: 1fr 1fr; }
+        .row3 { grid-template-columns: 1fr 1fr 1fr; }
+        @media (max-width: 820px) { .row2, .row3 { grid-template-columns: 1fr; } }
         .full-width { width: 100%; box-sizing: border-box; }
         .check-in-box { background: linear-gradient(135deg, #e0f7fa 0%, #ffffff 100%); border: 2px solid #b2ebf2; }
         .asset-form { display: flex; flex-direction: column; gap: 15px; }
@@ -97,6 +103,8 @@
 
     <!-- HOME -->
     <div id="view-home" class="view-section active">
+      <div class="stack">
+        <div class="row2">
         <div class="card full-width" style="background:linear-gradient(135deg,#2c3e50 0%,#4ca1af 100%);color:white;padding:20px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
                 <h2 style="margin:0;font-size:1.1rem;opacity:0.9;">⏳ 時間倒數</h2>
@@ -125,16 +133,19 @@
             <button onclick="submitHabit()" id="submitBtn" style="background:#00897b;width:100%;">送出紀錄</button>
             <span id="statusMsg" style="margin-left:10px;color:#666;"></span>
         </div>
+        </div>
 
         <div class="card">
             <h2>📈 能力成長曲線</h2>
             <canvas id="habitChart"></canvas>
         </div>
+      </div>
     </div>
 
     <!-- EXPENSES -->
     <div id="view-expenses" class="view-section">
-        <div class="grid-container">
+      <div class="stack">
+        <div class="row2">
             <div class="card" style="background:linear-gradient(135deg,#388e3c 0%,#81c784 100%);color:white;text-align:center;padding:20px;">
                 <h2 style="margin:0;font-size:1rem;opacity:0.9;">💸 生活可用</h2>
                 <div id="livingFundsDisplay" style="font-size:2rem;font-weight:bold;">...</div>
@@ -155,6 +166,7 @@
             </div>
         </div>
 
+        <div class="row2">
         <div class="card">
             <h2>💸 日常記帳</h2>
             <div style="margin-bottom:15px;">
@@ -190,6 +202,7 @@
                 <label>金額：<input type="number" id="transAmount" placeholder="1000"></label>
                 <button onclick="submitTransfer()" id="btnTrans" style="background:#9c27b0;width:100%;">確認</button>
             </div>
+        </div>
         </div>
 
         <div class="card full-width">
@@ -229,10 +242,12 @@
                 <li style="color:#888;">載入中...</li>
             </ul>
         </div>
+      </div>
     </div>
 
     <!-- ASSETS -->
     <div id="view-assets" class="view-section">
+      <div class="stack">
         <div class="card full-width" style="background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);color:white;text-align:center;padding:30px;">
             <h2 style="margin:0;font-size:1.2rem;opacity:0.8;">💰 總資產淨值</h2>
             <div id="totalAssetsDisplay" style="font-size:3.5rem;font-weight:bold;margin:10px 0;">計算中...</div>
@@ -257,25 +272,13 @@
             <div style="height:300px;"><canvas id="trendChart"></canvas></div>
         </div>
 
+        <div class="row3">
         <div class="card">
             <h2>📊 配置比例</h2>
-            <div style="height:300px;"><canvas id="assetPieChart"></canvas></div>
+            <div style="height:280px;"><canvas id="assetPieChart"></canvas></div>
         </div>
 
-        <div class="card full-width">
-            <h2>📜 持股明細 (庫存)</h2>
-            <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
-                <thead><tr style="border-bottom:2px solid #ddd;text-align:left;color:#666;"><th style="padding:10px 5px;">項目</th><th style="padding:10px 5px;text-align:right;">持有數量</th><th style="padding:10px 5px;text-align:right;">現值</th></tr></thead>
-                <tbody id="holdingsTableBody"><tr><td colspan="3" style="text-align:center;color:#999;padding:20px;">載入中...</td></tr></tbody>
-            </table>
-        </div>
-
-        <div class="card">
-            <h2>💵 每月收入</h2>
-            <div style="height:250px;"><canvas id="incomeSourceChart"></canvas></div>
-        </div>
-
-        <div class="card full-width" style="border-left:5px solid #fbc02d;">
+        <div class="card" style="border-left:5px solid #fbc02d;">
             <h2>📈 股票交易</h2>
             <div class="asset-form">
                 <label>日期：<input type="date" id="stDate"></label>
@@ -308,6 +311,21 @@
                 </div>
             </div>
         </div>
+
+        <div class="card">
+            <h2>💵 每月收入</h2>
+            <div style="height:280px;"><canvas id="incomeSourceChart"></canvas></div>
+        </div>
+        </div>
+
+        <div class="card full-width">
+            <h2>📜 持股明細 (庫存)</h2>
+            <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+                <thead><tr style="border-bottom:2px solid #ddd;text-align:left;color:#666;"><th style="padding:10px 5px;">項目</th><th style="padding:10px 5px;text-align:right;">持有數量</th><th style="padding:10px 5px;text-align:right;">現值</th></tr></thead>
+                <tbody id="holdingsTableBody"><tr><td colspan="3" style="text-align:center;color:#999;padding:20px;">載入中...</td></tr></tbody>
+            </table>
+        </div>
+      </div>
     </div>
 
     <!-- MORE -->
@@ -316,6 +334,8 @@
             <button id="darkToggle" onclick="toggleDark()" class="quick-btn">🌙 深色模式</button>
         </div>
 
+      <div class="stack">
+        <div class="row2">
         <div class="card full-width" style="border-left:5px solid #009688;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                 <h2 style="margin:0;">📌 固定支出</h2>
@@ -328,7 +348,9 @@
             <h2>💳 帳戶餘額對帳</h2>
             <div id="accountBalanceContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:15px;"><div style="color:#888;">計算中...</div></div>
         </div>
+        </div>
 
+        <div class="row2">
         <div class="card full-width" style="border-left:5px solid #ff9800;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
                 <h2>🛍️ 夢想購物車</h2>
@@ -358,6 +380,8 @@
             </div>
             <div id="mediaContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:15px;">載入中...</div>
         </div>
+        </div>
+      </div>
     </div>
 </div>
 
