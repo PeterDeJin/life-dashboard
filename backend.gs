@@ -384,15 +384,55 @@ function autoLogRecurring() {
 }
 
 // =========================================================
+// 待辦提醒（每天早上）：推播「今天到期 + 逾期」的未完成待辦
+// =========================================================
+function todoReminder() {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Todo_DB');
+    if (!sheet) return;
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return;
+    var h = data[0];
+    var ti = _colIndex(h, ['任務', '項目', '標題']);
+    var di = _colIndex(h, ['截止日', '日期']);
+    var doi = _colIndex(h, ['完成']);
+    if (ti < 0 || di < 0) return;
+
+    var today = Utilities.formatDate(new Date(), 'GMT+8', 'yyyy/MM/dd');
+    function isDone(v) { v = String(v).trim().toUpperCase(); return v === 'TRUE' || v === '是' || v === '1' || v === 'Y' || v === 'YES' || v === 'V' || v === '✓'; }
+
+    var due = [], over = [];
+    for (var i = 1; i < data.length; i++) {
+      var r = data[i];
+      if (doi >= 0 && isDone(r[doi])) continue;
+      var title = String(r[ti] || '').trim(); if (!title) continue;
+      var dv = r[di]; if (!dv) continue;
+      var dd = (dv instanceof Date) ? dv : new Date(String(dv).replace(/\//g, '-'));
+      if (isNaN(dd)) continue;
+      var ddStr = Utilities.formatDate(dd, 'GMT+8', 'yyyy/MM/dd');
+      if (ddStr === today) due.push(title);
+      else if (ddStr < today) over.push(title);
+    }
+    if (!due.length && !over.length) return;
+
+    var msg = '';
+    if (over.length) msg += '逾期：' + over.join('、');
+    if (due.length) msg += (msg ? '\n' : '') + '今天：' + due.join('、');
+    _bark('待辦提醒（' + (due.length + over.length) + ' 件）', msg);
+  } catch (e) {}
+}
+
+// =========================================================
 // 一鍵建立排程：在編輯器選這個函數按「執行」一次即可
 // =========================================================
 function setupTriggers() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     var fn = t.getHandlerFunction();
-    if (fn === 'autoLogRecurring' || fn === 'dailyLogReminder' || fn === 'updateBetas') ScriptApp.deleteTrigger(t);
+    if (fn === 'autoLogRecurring' || fn === 'dailyLogReminder' || fn === 'updateBetas' || fn === 'todoReminder') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('autoLogRecurring').timeBased().everyDays(1).atHour(2).create();   // 每天凌晨 2 點：固定支出自動記帳
   ScriptApp.newTrigger('dailyLogReminder').timeBased().everyDays(1).atHour(22).create();  // 每天 22 點：記帳提醒
+  ScriptApp.newTrigger('todoReminder').timeBased().everyDays(1).atHour(8).create();       // 每天 8 點：待辦提醒
   ScriptApp.newTrigger('updateBetas').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(3).create(); // 每週日 3 點：更新個股 Beta
 }
 
