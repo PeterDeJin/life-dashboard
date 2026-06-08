@@ -308,7 +308,8 @@
       <div class="stack">
         <div class="card full-width" style="background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);color:white;text-align:center;padding:30px;">
             <h2 style="margin:0;font-size:1.2rem;opacity:0.8;">💰 總資產淨值</h2>
-            <div id="totalAssetsDisplay" style="font-size:3.5rem;font-weight:bold;margin:10px 0;">計算中...</div>
+            <div id="totalAssetsDisplay" style="font-size:3.5rem;font-weight:bold;margin:10px 0 2px;">計算中...</div>
+            <div id="todayPnlDisplay" style="font-size:1rem;font-weight:bold;margin-bottom:8px;opacity:0.95;">今日 計算中…</div>
             <div style="margin-top:20px;text-align:left;">
                 <div style="display:flex;justify-content:space-between;font-size:0.9em;opacity:0.9;margin-bottom:5px;"><span>🎯 第一桶金目標</span><span id="goalPercent">0%</span></div>
                 <div class="progress-container"><div id="goalProgressBar" class="progress-bar"></div></div>
@@ -1155,7 +1156,7 @@ function loadAssetChart() {
         // 買股：富邦銀行 買XXXX(-), 富邦證券 XXXX(+成本)
         // 賣股：富邦銀行 賣XXXX(+實收), 富邦證券 XXXX(-成本，非賣出金額)
         // 當沖：富邦銀行 買賣XXXX(淨損益，不進富邦證券)
-        let totalAssets=0, investMV=0, totalBuyCost=0, itemCostMap={}, positionProceeds=0, tradeNetPnL=0, divs=0;
+        let totalAssets=0, investMV=0, totalBuyCost=0, itemCostMap={}, positionProceeds=0, tradeNetPnL=0, divs=0, todayPnL=0;
         logData.forEach(row => {
             let acc=(row['帳戶']||"").toString(), amt=n(row['金額']), name=String(fItem(row));
             if (acc==="富邦證券") {
@@ -1196,6 +1197,7 @@ function loadAssetChart() {
             globalSnapshotData.push({item:name,qty,mv,cost});
             let unit=name.match(/00|Stock/)?"股":name.match(/BTC|ETH/)?"顆":name.match(/黃金/)?"克":isCash?"元":"單位";
             let dc=(pNow-pYest)*qty, showDc=dc!==0&&Math.abs(pNow-1)>0.01&&!isCash;
+            if(!isCash&&qty>0&&pYest>1&&pNow>0) todayPnL+=dc; // 今日損益：排除現金與沒有有效昨收(=1 佔位)的列
             let dcColor=dc>0?"#ff4d4f":dc<0?"#52c41a":"#999";
             let dcText=showDc?`<div style="color:${dcColor};font-size:0.85em;margin-top:3px;">${dc>0?"▲ +":"▼ "}$${Math.abs(Math.round(dc)).toLocaleString()}</div>`:`<div style="color:#ccc;font-size:0.8em;margin-top:3px;">-</div>`;
             let rc=mv<0?"#e91e63":"inherit", dc2=mv>0?palette[i%palette.length]:"#e91e63";
@@ -1205,6 +1207,12 @@ function loadAssetChart() {
         document.getElementById('holdingsTableBody').innerHTML=tableHtml||"<tr><td colspan='3' style='text-align:center;'>無資產</td></tr>";
         globalTotalAssets=totalAssets;
         document.getElementById('totalAssetsDisplay').innerText="$"+totalAssets.toLocaleString();
+        let tEl=document.getElementById('todayPnlDisplay');
+        if(tEl){
+            let yMv=investMV-todayPnL, tpct=yMv>0?(todayPnL/yMv*100):0, up=todayPnL>=0;
+            tEl.innerHTML=`今日 ${up?'▲':'▼'} ${up?'+':'-'}$${Math.abs(Math.round(todayPnL)).toLocaleString()} (${up?'+':''}${tpct.toFixed(2)}%)`;
+            tEl.style.color=up?'#ff9999':'#99ff99';
+        }
         let pct=Math.min(100,Math.round((totalAssets/SAVING_GOAL)*100));
         document.getElementById('goalProgressBar').style.width=pct+"%";
         document.getElementById('goalPercent').innerText=pct+"%";
