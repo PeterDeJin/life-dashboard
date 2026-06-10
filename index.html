@@ -1257,7 +1257,7 @@ function submitExpense() {
 }
 function cancelEditExpense(){
     editingExpenseId=null;
-    const btn=document.getElementById('btnExp'); if(btn){ btn.innerText="記一筆"; btn.style.background="#e91e63"; }
+    const btn=document.getElementById('btnExp'); if(btn){ btn.innerText="記一筆"; btn.style.background="#e91e63"; btn.disabled=false; }
 }
 function editExpense(id){
     const row=(globalExpensesData||[]).find(r=>String(r.ID)===String(id));
