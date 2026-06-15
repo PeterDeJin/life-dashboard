@@ -101,6 +101,8 @@
         body.dark .cal-num { color: #ddd; }
         body.dark .cal-day:hover { background: #2a2a2a; }
         body.dark .cal-sel { background: #23344d; }
+        .cal-hol .cal-num { color: #d32f2f; }
+        body.dark .cal-hol .cal-num { color: #ff6b6b; }
     </style>
 </head>
 <body>
@@ -772,8 +774,26 @@ function buildCalData(){
         }).filter(Boolean);
     });
 }
+let holidayCache={}; // 年 -> { 'yyyy/mm/dd': {name, holiday} }
+function fetchHolidays(year){
+    if(holidayCache[year]) return Promise.resolve();
+    return fetch('https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/'+year+'.json')
+        .then(r=>r.ok?r.json():[])
+        .then(arr=>{
+            const map={};
+            (Array.isArray(arr)?arr:[]).forEach(x=>{
+                if(!x.description) return;
+                const s=String(x.date); if(s.length!==8) return;
+                map[s.slice(0,4)+'/'+s.slice(4,6)+'/'+s.slice(6,8)]={name:x.description, holiday:!!x.isHoliday};
+            });
+            holidayCache[year]=map;
+        }).catch(()=>{ holidayCache[year]={}; });
+}
 function calItems(y,m,d){
-    let arr=(calTodoMap[calKey(y,m,d)]||[]).slice();
+    let arr=[];
+    const hol=(holidayCache[y]||{})[calKey(y,m,d)];
+    if(hol) arr.push({label:(hol.holiday?'🎌 ':'💼 ')+hol.name, color:hol.holiday?'#d32f2f':'#8d6e63'});
+    arr=arr.concat(calTodoMap[calKey(y,m,d)]||[]);
     calEvents.forEach(e=>{ if(e.m===m && e.d===d && (e.type==='yearly' || e.y===y)) arr.push({label:'🎯 '+e.title,color:'#9c27b0'}); });
     const last=new Date(y,m+1,0).getDate();
     calRecs.forEach(r=>{ if(Math.min(r.day,last)===d) arr.push({label:'💸 '+r.title+(r.amt?(' $'+r.amt.toLocaleString()):''),color:'#e91e63'}); });
@@ -792,8 +812,9 @@ function renderCalendar(){
             const d=cells[w+i];
             if(d===''){ html+='<div class="cal-cell"></div>'; continue; }
             const key=calKey(calYear,calMonth,d), items=calItems(calYear,calMonth,d);
+            const hol=(holidayCache[calYear]||{})[key];
             const dots=items.slice(0,4).map(x=>`<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${x.color};margin:0 1px;"></span>`).join('');
-            html+=`<div class="cal-cell cal-day${key===tKey?' cal-today':''}${key===calSelected?' cal-sel':''}" data-key="${key}"><div class="cal-num">${d}</div><div class="cal-dots">${dots}</div></div>`;
+            html+=`<div class="cal-cell cal-day${key===tKey?' cal-today':''}${key===calSelected?' cal-sel':''}${hol&&hol.holiday?' cal-hol':''}" data-key="${key}"><div class="cal-num">${d}</div><div class="cal-dots">${dots}</div></div>`;
         }
         html+='</div>';
     }
@@ -810,11 +831,11 @@ function renderCalDetail(key){
         : head+"<div style='color:#bbb;'>這天沒有安排</div>";
     document.querySelectorAll('#calGrid .cal-day').forEach(el=>el.classList.toggle('cal-sel', el.dataset.key===key));
 }
-function calShift(delta){ calMonth+=delta; if(calMonth<0){calMonth=11;calYear--;} if(calMonth>11){calMonth=0;calYear++;} calSelected=null; renderCalendar(); }
+function calShift(delta){ calMonth+=delta; if(calMonth<0){calMonth=11;calYear--;} if(calMonth>11){calMonth=0;calYear++;} calSelected=null; fetchHolidays(calYear).then(renderCalendar); }
 function loadCalendar(){
     const now=new Date();
     if(calYear===undefined){ calYear=now.getFullYear(); calMonth=now.getMonth(); }
-    buildCalData().then(renderCalendar).catch(()=>{ const g=document.getElementById('calGrid'); if(g) g.innerHTML="<div style='color:#ccc;'>讀取失敗</div>"; });
+    Promise.all([buildCalData(), fetchHolidays(calYear)]).then(renderCalendar).catch(()=>{ const g=document.getElementById('calGrid'); if(g) g.innerHTML="<div style='color:#ccc;'>讀取失敗</div>"; });
 }
 
 // ===== 下拉選單自動生成 =====
