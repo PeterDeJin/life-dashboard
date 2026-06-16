@@ -335,6 +335,12 @@
             <div style="height:300px;"><canvas id="trendChart"></canvas></div>
         </div>
 
+        <div class="card full-width">
+            <h2>📊 我的資產 vs 大盤</h2>
+            <div style="height:280px;"><canvas id="vsMarketChart"></canvas></div>
+            <div style="font-size:0.8em;color:#999;margin-top:6px;">以總資產成長率對照加權指數（從第一次快照起算）。總資產含你的存入，非純投資報酬，僅供走勢對照。</div>
+        </div>
+
         <div class="row3">
         <div class="card">
             <h2>📊 配置比例</h2>
@@ -521,7 +527,7 @@ const OPTIONS = {
 Chart.register(ChartDataLabels);
 Chart.defaults.set('plugins.datalabels', { display: false });
 
-let myChart=null, assetChart=null, incomeChart=null, compareChart=null, trendChart=null, moodChart=null;
+let myChart=null, assetChart=null, incomeChart=null, compareChart=null, trendChart=null, moodChart=null, vsChart=null;
 let globalSnapshotData=[], globalTotalAssets=0, globalLivingFunds=0, globalExpensesData=[];
 let expShowCount=20; // 記帳列表目前顯示筆數（「載入更多」會增加）
 let editingExpenseId=null; // 記帳編輯模式：非 null 表示正在編輯該筆 ID
@@ -828,9 +834,11 @@ function renderCalDetail(key){
     const box=document.getElementById('calDetail'); if(!box) return;
     const p=key.split('/'), items=calItems(+p[0],+p[1]-1,+p[2]);
     const head=`<div style="font-weight:bold;margin-bottom:6px;color:#333;">${key}</div>`;
-    box.innerHTML = items.length
-        ? head+items.map(x=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${x.color};flex:none;"></span><span style="color:#444;">${esc(x.label)}</span></div>`).join('')
-        : head+"<div style='color:#bbb;'>這天沒有安排</div>";
+    const body = items.length
+        ? items.map(x=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${x.color};flex:none;"></span><span style="color:#444;">${esc(x.label)}</span></div>`).join('')
+        : "<div style='color:#bbb;'>這天沒有安排</div>";
+    const addRow = `<div style="margin-top:10px;display:flex;gap:8px;"><button class="cal-add-todo" data-key="${esc(key)}" style="background:#3f51b5;font-size:0.8rem;padding:5px 14px;">＋ 待辦</button><button class="cal-add-evt" data-key="${esc(key)}" style="background:#4ca1af;font-size:0.8rem;padding:5px 14px;">＋ 事件</button></div>`;
+    box.innerHTML = head + body + addRow;
     document.querySelectorAll('#calGrid .cal-day').forEach(el=>el.classList.toggle('cal-sel', el.dataset.key===key));
 }
 function calShift(delta){ calMonth+=delta; if(calMonth<0){calMonth=11;calYear--;} if(calMonth>11){calMonth=0;calYear++;} calSelected=null; fetchHolidays(calYear).then(renderCalendar); }
@@ -838,6 +846,49 @@ function loadCalendar(){
     const now=new Date();
     if(calYear===undefined){ calYear=now.getFullYear(); calMonth=now.getMonth(); }
     Promise.all([buildCalData(), fetchHolidays(calYear)]).then(renderCalendar).catch(()=>{ const g=document.getElementById('calGrid'); if(g) g.innerHTML="<div style='color:#ccc;'>讀取失敗</div>"; });
+}
+function calQuickAddTodo(key){
+    cancelEditExpense();
+    document.getElementById('todoDue').value=key.replace(/\//g,'-');
+    const el=document.getElementById('todoTitle'); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.focus(); }
+    toast('已帶入日期，輸入任務按「新增」即可','info');
+}
+function calQuickAddEvent(key){
+    const f=document.getElementById('eventForm'); if(f && f.style.display==='none') toggleEventForm();
+    document.getElementById('evtDate').value=key.replace(/\//g,'-');
+    const el=document.getElementById('evtTitle'); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.focus(); }
+    toast('已帶入日期，輸入事件名稱按「新增」即可','info');
+}
+
+// ========== 我的資產 vs 大盤 ==========
+function loadVsMarket(){
+    const ctx=document.getElementById('vsMarketChart'); if(!ctx) return;
+    const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    fetchTab('History_Log').then(hist=>{
+        if(!Array.isArray(hist)) return;
+        let pts=[];
+        hist.forEach(r=>{
+            if(String(r.資產名稱||'')!=='總資產') return;
+            let v=n(r.現淨值), ds=String(r.日期||'').replace(/\//g,'-').split('T')[0], d=new Date(ds+'T00:00:00');
+            if(v>0&&!isNaN(d)) pts.push({ds,t:d.getTime(),v});
+        });
+        let byd={}; pts.forEach(p=>byd[p.ds]=p); pts=Object.values(byd).sort((a,b)=>a.t-b.t);
+        if(pts.length<2) return; // 至少要兩次快照才比得了
+        const url='https://query1.finance.yahoo.com/v8/finance/chart/%5ETWII?interval=1d&period1='+Math.floor(pts[0].t/1000)+'&period2='+Math.floor(Date.now()/1000);
+        fetch(url,{headers:{'User-Agent':'Mozilla/5.0'}}).then(r=>r.json()).then(j=>{
+            const res=j&&j.chart&&j.chart.result&&j.chart.result[0]; let twii={};
+            if(res&&res.timestamp){ const cl=res.indicators.quote[0].close; res.timestamp.forEach((ts,i)=>{ if(cl[i]!=null) twii[ymd(new Date(ts*1000))]=cl[i]; }); }
+            const twiiOn=ds=>{ let d=new Date(ds+'T00:00:00'); for(let i=0;i<7;i++){ let k=ymd(d); if(twii[k]!=null) return twii[k]; d.setDate(d.getDate()-1); } return null; };
+            const base=pts[0].v, tBase=twiiOn(pts[0].ds);
+            let labels=[], mine=[], mkt=[];
+            pts.forEach(p=>{ labels.push(p.ds); mine.push(+(((p.v/base)-1)*100).toFixed(2)); let tc=twiiOn(p.ds); mkt.push((tc&&tBase)?+(((tc/tBase)-1)*100).toFixed(2):null); });
+            if(vsChart) vsChart.destroy();
+            vsChart=new Chart(ctx,{type:'line',data:{labels,datasets:[
+                {label:'我的資產',data:mine,borderColor:'#2a5298',backgroundColor:'rgba(42,82,152,0.10)',fill:true,tension:0.2,pointRadius:3},
+                {label:'加權指數',data:mkt,borderColor:'#e91e63',borderDash:[5,4],tension:0.2,pointRadius:2}
+            ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:{y:{ticks:{callback:v=>v+'%'}}},plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.dataset.label+'：'+(c.parsed.y==null?'-':(c.parsed.y>=0?'+':'')+c.parsed.y+'%')}}}}});
+        }).catch(()=>{});
+    }).catch(()=>{});
 }
 
 // ===== 下拉選單自動生成 =====
@@ -908,6 +959,11 @@ function setupDelegation() {
     });
     const calG = document.getElementById('calGrid');
     if (calG) calG.addEventListener('click', e => { const c = e.target.closest('.cal-day'); if (c && c.dataset.key) renderCalDetail(c.dataset.key); });
+    const calD = document.getElementById('calDetail');
+    if (calD) calD.addEventListener('click', e => {
+        const t = e.target.closest('.cal-add-todo'); if (t) { calQuickAddTodo(t.dataset.key); return; }
+        const ev = e.target.closest('.cal-add-evt'); if (ev) { calQuickAddEvent(ev.dataset.key); }
+    });
     setupMoodPicker();
 }
 
@@ -953,6 +1009,7 @@ window.onload = async function() {
     loadMonthlyIncome();
     loadAccountBalances();
     loadTrendChart();
+    loadVsMarket();
     loadMediaList();
     loadTimeWidget();
     loadRecurring();
@@ -1554,7 +1611,7 @@ function snapshotAssets() {
     });
     rows.push([today,"總資產",1,totalMV,totalCost]);
     apiPost({tab:"History_Log",rows}).then(data=>{
-        if(data.includes("Success")){toast("📸 快照成功！",'success');reset();invalidateCache('History_Log');loadTrendChart();}
+        if(data.includes("Success")){toast("📸 快照成功！",'success');reset();invalidateCache('History_Log');loadTrendChart();loadVsMarket();}
         else{toast("失敗："+data,'error');reset();}
     }).catch(()=>{toast("連線錯誤，請重試",'error');reset();});
 }
