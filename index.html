@@ -446,6 +446,50 @@
             </div>
             <div id="mediaContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:15px;">載入中...</div>
         </div>
+
+        <div class="card full-width" style="border-left:5px solid #5c6bc0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h2 style="margin:0;">🎬 想看清單</h2>
+                <button onclick="toggleWatchForm()" style="background:#5c6bc0;font-size:0.8rem;padding:5px 12px;">＋ 加入</button>
+            </div>
+            <div id="watchForm" class="asset-form" style="display:none;background:#eef0fb;padding:15px;border-radius:10px;margin-bottom:15px;">
+                <select id="watchType"><option value="電影">電影</option><option value="影集">影集</option><option value="動漫">動漫</option><option value="書籍">書籍</option></select>
+                <input type="text" id="watchTitle" placeholder="標題">
+                <input type="text" id="watchNote" placeholder="備註（為什麼想看…）">
+                <button onclick="submitWatch(this)" style="background:#5c6bc0;color:white;">加入</button>
+            </div>
+            <div id="watchContainer" style="display:flex;flex-direction:column;gap:8px;">載入中...</div>
+        </div>
+
+        <div class="card full-width" style="border-left:5px solid #ff7043;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h2 style="margin:0;">🍽️ 美食地圖</h2>
+                <button onclick="toggleRestForm()" style="background:#ff7043;font-size:0.8rem;padding:5px 12px;">＋ 新增</button>
+            </div>
+            <div id="restForm" class="asset-form" style="display:none;background:#fff1ec;padding:15px;border-radius:10px;margin-bottom:15px;">
+                <input type="text" id="restName" placeholder="店名">
+                <input type="text" id="restCat" placeholder="分類 / 地點（如：拉麵・台北）">
+                <select id="restStatus"><option value="想吃">想吃</option><option value="吃過">吃過</option></select>
+                <select id="restRating"><option value="">未評分</option><option value="5">⭐⭐⭐⭐⭐</option><option value="4">⭐⭐⭐⭐</option><option value="3">⭐⭐⭐</option><option value="2">⭐⭐</option><option value="1">⭐</option></select>
+                <input type="text" id="restNote" placeholder="心得">
+                <button onclick="submitRest(this)" style="background:#ff7043;color:white;">新增</button>
+            </div>
+            <div id="restContainer" style="display:flex;flex-direction:column;gap:8px;">載入中...</div>
+        </div>
+
+        <div class="card full-width" style="border-left:5px solid #26a69a;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h2 style="margin:0;">✈️ 旅遊足跡</h2>
+                <button onclick="toggleTravelForm()" style="background:#26a69a;font-size:0.8rem;padding:5px 12px;">＋ 新增</button>
+            </div>
+            <div id="travelForm" class="asset-form" style="display:none;background:#e6f5f3;padding:15px;border-radius:10px;margin-bottom:15px;">
+                <input type="text" id="travelPlace" placeholder="地點">
+                <select id="travelStatus"><option value="想去">想去</option><option value="去過">去過</option></select>
+                <input type="text" id="travelNote" placeholder="心得 / 備註">
+                <button onclick="submitTravel(this)" style="background:#26a69a;color:white;">新增</button>
+            </div>
+            <div id="travelContainer" style="display:flex;flex-direction:column;gap:8px;">載入中...</div>
+        </div>
       </div>
     </div>
 </div>
@@ -891,6 +935,95 @@ function loadVsMarket(){
     }).catch(()=>{});
 }
 
+// ========== 想看清單 ==========
+function toggleWatchForm(){const f=document.getElementById('watchForm');f.style.display=f.style.display==='none'?'flex':'none';}
+function submitWatch(btn){
+    const title=document.getElementById('watchTitle').value.trim(); if(!title){toast('請填標題','error');return;}
+    btn.disabled=true;
+    apiPost({tab:'Watchlist_DB',type:document.getElementById('watchType').value,title,note:document.getElementById('watchNote').value,id:newId()}).then(d=>{
+        if(d.includes('Success')){toast('✨ 已加入想看','success');document.getElementById('watchTitle').value='';document.getElementById('watchNote').value='';toggleWatchForm();invalidateCache('Watchlist_DB');loadWatchlist();}
+        else toast('失敗：'+d,'error');
+        btn.disabled=false;
+    }).catch(()=>{toast('連線錯誤，請重試','error');btn.disabled=false;});
+}
+function loadWatchlist(){
+    const c=document.getElementById('watchContainer'); if(!c) return;
+    fetchTab('Watchlist_DB').then(data=>{
+        if(!Array.isArray(data)||!data.length){c.innerHTML="<div style='color:#ccc;'>尚未設定（Sheet 開 Watchlist_DB：類型、標題、備註、ID）</div>";return;}
+        c.innerHTML=data.map(r=>{
+            const id=esc(r.ID!==undefined?r.ID:''),title=esc(r.標題||r.名稱||''),type=String(r.類型||r.類別||''),note=esc(r.備註||r.心得||'');
+            const icon=type==='電影'?'🎬':type==='影集'?'📺':type==='動漫'?'🍥':'📖';
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:#f8f9fa;border-radius:8px;"><div><span style="font-weight:bold;color:#333;">${icon} ${title}</span> <span style="font-size:0.78em;color:#888;">${esc(type)}</span>${note?`<br><span style="font-size:0.85em;color:#999;">${note}</span>`:''}</div><div style="display:flex;gap:6px;flex:none;"><button class="watch-done" data-id="${id}" data-t="${esc(type)}" data-n="${title}" style="background:#4caf50;color:#fff;font-size:0.8em;padding:5px 10px;border-radius:5px;border:none;">看完</button><button class="watch-del" data-id="${id}" style="background:#ffebee;color:#c62828;font-size:0.8em;padding:5px 8px;border-radius:5px;border:1px solid #ffcdd2;">🗑️</button></div></div>`;
+        }).join('');
+    }).catch(()=>{c.innerHTML="<div style='color:#ccc;'>讀取失敗</div>";});
+}
+function watchDone(id,type,title){
+    const f=document.getElementById('mediaForm'); if(f && f.style.display==='none') toggleMediaForm();
+    const mt=document.getElementById('mediaType'); if(mt) mt.value=(type==='動漫')?'動漫':(type==='書籍')?'書籍':'影片';
+    document.getElementById('mediaTitle').value=title;
+    document.getElementById('mediaTitle').scrollIntoView({behavior:'smooth',block:'center'});
+    apiPost({action:'delete',tab:'Watchlist_DB',id}).catch(()=>{});
+    invalidateCache('Watchlist_DB'); loadWatchlist();
+    toast('已帶到書櫃，評分後按儲存即可','success');
+}
+function deleteWatch(id,btn){
+    btn.innerText='⏳';btn.disabled=true;
+    apiPost({action:'delete',tab:'Watchlist_DB',id}).then(d=>{ if(d.includes('Deleted')){invalidateCache('Watchlist_DB');loadWatchlist();} else {toast('刪除失敗','error');btn.innerText='🗑️';btn.disabled=false;} }).catch(()=>{toast('連線錯誤','error');btn.innerText='🗑️';btn.disabled=false;});
+}
+
+// ========== 美食地圖 ==========
+function _stars(n){ n=Math.max(0,Math.min(5,Number(n)||0)); return n?'⭐'.repeat(n):''; }
+function toggleRestForm(){const f=document.getElementById('restForm');f.style.display=f.style.display==='none'?'flex':'none';}
+function submitRest(btn){
+    const name=document.getElementById('restName').value.trim(); if(!name){toast('請填店名','error');return;}
+    btn.disabled=true;
+    apiPost({tab:'Restaurant_DB',name,cat:document.getElementById('restCat').value,status:document.getElementById('restStatus').value,rating:document.getElementById('restRating').value,note:document.getElementById('restNote').value,id:newId()}).then(d=>{
+        if(d.includes('Success')){toast('🍽️ 已新增','success');['restName','restCat','restNote'].forEach(i=>document.getElementById(i).value='');toggleRestForm();invalidateCache('Restaurant_DB');loadRestaurants();}
+        else toast('失敗：'+d,'error');
+        btn.disabled=false;
+    }).catch(()=>{toast('連線錯誤，請重試','error');btn.disabled=false;});
+}
+function loadRestaurants(){
+    const c=document.getElementById('restContainer'); if(!c) return;
+    fetchTab('Restaurant_DB').then(data=>{
+        if(!Array.isArray(data)||!data.length){c.innerHTML="<div style='color:#ccc;'>尚未設定（Sheet 開 Restaurant_DB：店名、分類、狀態、評分、心得、ID）</div>";return;}
+        c.innerHTML=data.map(r=>{
+            const id=esc(r.ID!==undefined?r.ID:''),name=esc(r.店名||r.名稱||''),cat=esc(r.分類||r.類型||r.地點||''),st=String(r.狀態||'想吃'),note=esc(r.心得||r.備註||''),done=st==='吃過';
+            const badge=`<span style="font-size:0.75em;padding:2px 7px;border-radius:10px;background:${done?'#e8f5e9':'#fff3e0'};color:${done?'#2e7d32':'#e65100'};">${st}</span>`;
+            const doneBtn=done?'':`<button class="rest-done" data-id="${id}" style="background:#4caf50;color:#fff;font-size:0.8em;padding:5px 10px;border-radius:5px;border:none;">✓ 吃過</button>`;
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:#f8f9fa;border-radius:8px;"><div><span style="font-weight:bold;color:#333;">${name}</span> ${badge} <span style="color:#f39c12;">${_stars(r.評分)}</span>${cat?`<br><span style="font-size:0.82em;color:#888;">${cat}</span>`:''}${note?`<br><span style="font-size:0.85em;color:#999;">${note}</span>`:''}</div><div style="display:flex;gap:6px;flex:none;">${doneBtn}<button class="rest-del" data-id="${id}" style="background:#ffebee;color:#c62828;font-size:0.8em;padding:5px 8px;border-radius:5px;border:1px solid #ffcdd2;">🗑️</button></div></div>`;
+        }).join('');
+    }).catch(()=>{c.innerHTML="<div style='color:#ccc;'>讀取失敗</div>";});
+}
+function restMarkDone(id){ apiPost({action:'update',tab:'Restaurant_DB',id,status:'吃過'}).then(d=>{ if(d.includes('Updated')){toast('改成吃過了','success');invalidateCache('Restaurant_DB');loadRestaurants();} else toast('失敗：'+d,'error'); }).catch(()=>toast('連線錯誤','error')); }
+function deleteRest(id,btn){ btn.innerText='⏳';btn.disabled=true; apiPost({action:'delete',tab:'Restaurant_DB',id}).then(d=>{ if(d.includes('Deleted')){invalidateCache('Restaurant_DB');loadRestaurants();} else {toast('刪除失敗','error');btn.innerText='🗑️';btn.disabled=false;} }).catch(()=>{toast('連線錯誤','error');btn.innerText='🗑️';btn.disabled=false;}); }
+
+// ========== 旅遊足跡 ==========
+function toggleTravelForm(){const f=document.getElementById('travelForm');f.style.display=f.style.display==='none'?'flex':'none';}
+function submitTravel(btn){
+    const place=document.getElementById('travelPlace').value.trim(); if(!place){toast('請填地點','error');return;}
+    btn.disabled=true;
+    apiPost({tab:'Travel_DB',place,status:document.getElementById('travelStatus').value,note:document.getElementById('travelNote').value,id:newId()}).then(d=>{
+        if(d.includes('Success')){toast('✈️ 已新增','success');document.getElementById('travelPlace').value='';document.getElementById('travelNote').value='';toggleTravelForm();invalidateCache('Travel_DB');loadTravel();}
+        else toast('失敗：'+d,'error');
+        btn.disabled=false;
+    }).catch(()=>{toast('連線錯誤，請重試','error');btn.disabled=false;});
+}
+function loadTravel(){
+    const c=document.getElementById('travelContainer'); if(!c) return;
+    fetchTab('Travel_DB').then(data=>{
+        if(!Array.isArray(data)||!data.length){c.innerHTML="<div style='color:#ccc;'>尚未設定（Sheet 開 Travel_DB：地點、狀態、心得、ID）</div>";return;}
+        c.innerHTML=data.map(r=>{
+            const id=esc(r.ID!==undefined?r.ID:''),place=esc(r.地點||r.名稱||''),st=String(r.狀態||'想去'),note=esc(r.心得||r.備註||''),done=st==='去過';
+            const badge=`<span style="font-size:0.75em;padding:2px 7px;border-radius:10px;background:${done?'#e8f5e9':'#e6f5f3'};color:${done?'#2e7d32':'#00897b'};">${st}</span>`;
+            const doneBtn=done?'':`<button class="travel-done" data-id="${id}" style="background:#26a69a;color:#fff;font-size:0.8em;padding:5px 10px;border-radius:5px;border:none;">✓ 去過</button>`;
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:#f8f9fa;border-radius:8px;"><div><span style="font-weight:bold;color:#333;">📍 ${place}</span> ${badge}${note?`<br><span style="font-size:0.85em;color:#999;">${note}</span>`:''}</div><div style="display:flex;gap:6px;flex:none;">${doneBtn}<button class="travel-del" data-id="${id}" style="background:#ffebee;color:#c62828;font-size:0.8em;padding:5px 8px;border-radius:5px;border:1px solid #ffcdd2;">🗑️</button></div></div>`;
+        }).join('');
+    }).catch(()=>{c.innerHTML="<div style='color:#ccc;'>讀取失敗</div>";});
+}
+function travelMarkDone(id){ apiPost({action:'update',tab:'Travel_DB',id,status:'去過'}).then(d=>{ if(d.includes('Updated')){toast('改成去過了','success');invalidateCache('Travel_DB');loadTravel();} else toast('失敗：'+d,'error'); }).catch(()=>toast('連線錯誤','error')); }
+function deleteTravel(id,btn){ btn.innerText='⏳';btn.disabled=true; apiPost({action:'delete',tab:'Travel_DB',id}).then(d=>{ if(d.includes('Deleted')){invalidateCache('Travel_DB');loadTravel();} else {toast('刪除失敗','error');btn.innerText='🗑️';btn.disabled=false;} }).catch(()=>{toast('連線錯誤','error');btn.innerText='🗑️';btn.disabled=false;}); }
+
 // ===== 下拉選單自動生成 =====
 function fillSelect(id, opts) {
     const el = document.getElementById(id); if (!el) return;
@@ -964,6 +1097,12 @@ function setupDelegation() {
         const t = e.target.closest('.cal-add-todo'); if (t) { calQuickAddTodo(t.dataset.key); return; }
         const ev = e.target.closest('.cal-add-evt'); if (ev) { calQuickAddEvent(ev.dataset.key); }
     });
+    const watchC = document.getElementById('watchContainer');
+    if (watchC) watchC.addEventListener('click', e => { const dn = e.target.closest('.watch-done'); if (dn) { watchDone(dn.dataset.id, dn.dataset.t, dn.dataset.n); return; } const dl = e.target.closest('.watch-del'); if (dl) deleteWatch(dl.dataset.id, dl); });
+    const restC = document.getElementById('restContainer');
+    if (restC) restC.addEventListener('click', e => { const dn = e.target.closest('.rest-done'); if (dn) { restMarkDone(dn.dataset.id); return; } const dl = e.target.closest('.rest-del'); if (dl) deleteRest(dl.dataset.id, dl); });
+    const travelC = document.getElementById('travelContainer');
+    if (travelC) travelC.addEventListener('click', e => { const dn = e.target.closest('.travel-done'); if (dn) { travelMarkDone(dn.dataset.id); return; } const dl = e.target.closest('.travel-del'); if (dl) deleteTravel(dl.dataset.id, dl); });
     setupMoodPicker();
 }
 
@@ -995,7 +1134,8 @@ window.onload = async function() {
         fetchTab('Habit_Log'), fetchTab('Asset_Log'), fetchTab('Expenses_DB'),
         fetchTab('Portfolio'),  fetchTab('History_Log'), fetchTab('Media_Log'),
         fetchTab('Events_DB'),  fetchTab('Wishlist_DB'), fetchTab('Settings'),
-        fetchTab('Recurring_DB'), fetchTab('Todo_DB'), fetchTab('Mood_DB')
+        fetchTab('Recurring_DB'), fetchTab('Todo_DB'), fetchTab('Mood_DB'),
+        fetchTab('Watchlist_DB'), fetchTab('Restaurant_DB'), fetchTab('Travel_DB')
     ]).catch(e => console.warn("部分資料載入失敗:", e));
 
     await loadSettings(); // 覆蓋目標/預算（需在繪圖前）
@@ -1016,6 +1156,9 @@ window.onload = async function() {
     loadTodos();
     loadMood();
     loadCalendar();
+    loadWatchlist();
+    loadRestaurants();
+    loadTravel();
 
     applyDarkMode(); // 同步深色狀態與按鈕文字
 };

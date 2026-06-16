@@ -12,7 +12,10 @@ var SCHEMAS = {
   Events_DB:   [['title',['事件名稱']],['date',['日期']],['type',['類型']]],
   Wishlist_DB: [['date',['日期']],['item',['項目名稱','項目']],['amount',['預估金額','金額']],['note',['連結/備註','連結','備註']],['id',['ID']]],
   Todo_DB:     [['title',['任務','項目','標題']],['due',['截止日','日期']],['priority',['優先','優先序']],['done',['完成']],['id',['ID']]],
-  Mood_DB:     [['date',['日期']],['mood',['心情','分數','評分']],['note',['內容','日記','心得','備註']],['id',['ID']]]
+  Mood_DB:     [['date',['日期']],['mood',['心情','分數','評分']],['note',['內容','日記','心得','備註']],['id',['ID']]],
+  Watchlist_DB:  [['type',['類型','類別']],['title',['標題','名稱']],['note',['備註','心得']],['id',['ID']]],
+  Restaurant_DB: [['name',['店名','名稱']],['cat',['分類','類型','地點']],['status',['狀態']],['rating',['評分']],['note',['心得','備註']],['id',['ID']]],
+  Travel_DB:     [['place',['地點','名稱']],['status',['狀態']],['note',['心得','備註']],['id',['ID']]]
 };
 
 function out(s)     { return ContentService.createTextOutput(s); }
@@ -423,15 +426,58 @@ function todoReminder() {
 }
 
 // =========================================================
+// 紀念日 / 事件提醒（每天早上）：今天或明天的倒數事件就 Bark
+// 用現有 Events_DB（生日設成「每年重複」即可）
+// =========================================================
+function anniversaryReminder() {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Events_DB');
+    if (!sheet) return;
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return;
+    var h = data[0];
+    var ni = _colIndex(h, ['事件名稱', '名稱', '標題']);
+    var di = _colIndex(h, ['日期']);
+    var ti = _colIndex(h, ['類型', '型態']);
+    if (ni < 0 || di < 0) return;
+
+    var now = new Date(), tmrwD = new Date(now.getTime() + 86400000);
+    var todayMD = Utilities.formatDate(now, 'GMT+8', 'MM/dd'), tmrwMD = Utilities.formatDate(tmrwD, 'GMT+8', 'MM/dd');
+    var todayF = Utilities.formatDate(now, 'GMT+8', 'yyyy/MM/dd'), tmrwF = Utilities.formatDate(tmrwD, 'GMT+8', 'yyyy/MM/dd');
+
+    var hits = [];
+    for (var i = 1; i < data.length; i++) {
+      var name = String(data[i][ni] || '').trim(); if (!name) continue;
+      var dv = data[i][di]; if (!dv) continue;
+      var dd = (dv instanceof Date) ? dv : new Date(String(dv).replace(/\//g, '-').split('T')[0]);
+      if (isNaN(dd)) continue;
+      var type = ti >= 0 ? String(data[i][ti] || '').toLowerCase() : '';
+      if (type.indexOf('year') >= 0) {
+        var md = Utilities.formatDate(dd, 'GMT+8', 'MM/dd');
+        if (md === todayMD) hits.push('今天｜' + name);
+        else if (md === tmrwMD) hits.push('明天｜' + name);
+      } else {
+        var f = Utilities.formatDate(dd, 'GMT+8', 'yyyy/MM/dd');
+        if (f === todayF) hits.push('今天｜' + name);
+        else if (f === tmrwF) hits.push('明天｜' + name);
+      }
+    }
+    if (hits.length) _bark('紀念日提醒', hits.join('\n'));
+  } catch (e) {}
+}
+
+// =========================================================
 // 一鍵建立排程：在編輯器選這個函數按「執行」一次即可
 // =========================================================
 function setupTriggers() {
   // 清掉所有現有觸發器（含舊版殘留，如 GOLD_REFRESH_ALL）再重建，避免孤兒觸發器一直報錯
   ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('autoLogRecurring').timeBased().everyDays(1).atHour(2).create();   // 每天凌晨 2 點：固定支出自動記帳
-  ScriptApp.newTrigger('dailyLogReminder').timeBased().everyDays(1).atHour(22).create();  // 每天 22 點：記帳提醒
-  ScriptApp.newTrigger('todoReminder').timeBased().everyDays(1).atHour(8).create();       // 每天 8 點：待辦提醒
-  ScriptApp.newTrigger('updateBetas').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(3).create(); // 每週日 3 點：更新個股 Beta
+  // nearMinute(0) 讓它盡量靠近整點觸發（GAS 仍有 ±15 分鐘誤差，無法到分秒精準）
+  ScriptApp.newTrigger('autoLogRecurring').timeBased().everyDays(1).atHour(2).nearMinute(0).create();   // 每天凌晨 2 點：固定支出自動記帳
+  ScriptApp.newTrigger('dailyLogReminder').timeBased().everyDays(1).atHour(22).nearMinute(0).create();  // 每天 22 點：記帳提醒
+  ScriptApp.newTrigger('todoReminder').timeBased().everyDays(1).atHour(8).nearMinute(0).create();       // 每天 8 點：待辦提醒
+  ScriptApp.newTrigger('anniversaryReminder').timeBased().everyDays(1).atHour(8).nearMinute(0).create();// 每天 8 點：紀念日/事件提醒
+  ScriptApp.newTrigger('updateBetas').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(3).nearMinute(0).create(); // 每週日 3 點：更新個股 Beta
 }
 
 // =========================================================
