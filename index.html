@@ -1186,9 +1186,16 @@ function submitHabit() {
 function loadChart() {
     fetchTab('Habit_Log').then(data => {
         if (!data.length) return;
-        const recent = data.slice(-30), dates = recent.map(d => formatDate(d.日期));
+        const dates = data.map(d => formatDate(d.日期)).slice(-30);
         function trend(col) {
-            let s=100; return recent.map(d => { let v=d[col]; s*=(v===true||v==="TRUE"||v==="True")?1.01:0.99; return s.toFixed(2); });
+            let s=100;
+            const all = data.map(d => {
+                let v=d[col];
+                let blank=(v===undefined||v===null||String(v).trim()==='');
+                if(!blank) s*=_isDone(v)?1.01:0.99;  // 有記錄才計;空白(還沒開始記這習慣)不動,s 維持不變
+                return s.toFixed(2);
+            });
+            return all.slice(-30);  // 從第一天一路相乘(終身累積),只顯示最近 30 天
         }
         const ctx = document.getElementById('habitChart');
         if (myChart) myChart.destroy();
