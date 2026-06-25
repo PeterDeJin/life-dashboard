@@ -390,10 +390,10 @@
 
         <div class="card full-width">
             <h2>📜 持股明細 (庫存)</h2>
-            <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
-                <thead><tr style="border-bottom:2px solid #ddd;text-align:left;color:#666;"><th style="padding:10px 5px;">項目</th><th style="padding:10px 5px;text-align:right;">持有數量</th><th style="padding:10px 5px;text-align:right;">現值</th></tr></thead>
-                <tbody id="holdingsTableBody"><tr><td colspan="3" style="text-align:center;color:#999;padding:20px;">載入中...</td></tr></tbody>
-            </table>
+            <div id="holdingsList" style="display:flex;flex-direction:column;gap:8px;">
+                <div style="text-align:center;color:#999;padding:20px;">載入中...</div>
+            </div>
+            <div id="holdingsTotal"></div>
         </div>
       </div>
     </div>
@@ -1375,6 +1375,46 @@ async function submitStockTrade() {
     }
 }
 
+// 常見台股／ETF 代號→名稱對照(查不到就只顯示代號)
+const STOCK_NAMES={"0050":"元大台灣50","0056":"元大高股息","006208":"富邦台50","00878":"國泰永續高股息","00919":"群益台灣精選高息","00929":"復華台灣科技優息","00940":"元大台灣價值高息","00713":"元大台灣高息低波","2330":"台積電","2317":"鴻海","2454":"聯發科","2308":"台達電","2303":"聯電","2412":"中華電","2882":"國泰金","2881":"富邦金","2891":"中信金","2886":"兆豐金","2884":"玉山金","2885":"元大金","2892":"第一金","1301":"台塑","1303":"南亞","2002":"中鋼","2207":"和泰車","2327":"國巨","2382":"廣達","2357":"華碩","2379":"瑞昱","2376":"技嘉","3231":"緯創","2356":"英業達","3008":"大立光","2603":"長榮","2609":"陽明","2615":"萬海","2618":"長榮航","1216":"統一","2912":"統一超","1101":"台泥","6187":"萬潤","1717":"長興","2474":"可成","3045":"台灣大","5871":"中租-KY"};
+
+// 持股明細卡片渲染(依現值排序,含報酬率、佔比、今日漲跌)
+function renderHoldings(rows, investMV){
+    const listEl=document.getElementById('holdingsList'), totalEl=document.getElementById('holdingsTotal');
+    if(!listEl) return;
+    if(!rows.length){ listEl.innerHTML='<div style="text-align:center;color:#999;padding:20px;">無持股</div>'; if(totalEl) totalEl.innerHTML=''; return; }
+    rows.sort((a,b)=>b.mv-a.mv);
+    listEl.innerHTML=rows.map(d=>{
+        const code=String(d.name).trim(), sname=STOCK_NAMES[code]||"", isETF=/^00/.test(code);
+        const unit=/BTC|ETH/i.test(code)?"顆":/黃金/.test(code)?"克":"股";
+        const w=investMV>0?d.mv/investMV*100:0;
+        const roi=d.cost>0?(d.mv-d.cost)/d.cost*100:null, pnl=d.cost>0?d.mv-d.cost:null;
+        const dayPct=(d.showDc&&(d.mv-d.dc)>0)?d.dc/(d.mv-d.dc)*100:null;
+        let dayHtml;
+        if(d.showDc){ const c=d.dc>0?"#ff4d4f":d.dc<0?"#52c41a":"#999"; dayHtml=`<span style="font-size:0.8em;color:${c};">今日 ${d.dc>0?"▲":"▼"} ${d.dc>0?"+":"-"}$${Math.abs(Math.round(d.dc)).toLocaleString()}${dayPct!==null?` (${d.dc>0?"+":""}${dayPct.toFixed(2)}%)`:""}</span>`; }
+        else dayHtml='<span style="font-size:0.8em;color:#ccc;">今日 —</span>';
+        let roiHtml;
+        if(roi!==null){ const c=roi>=0?"#ff4d4f":"#52c41a", bg=roi>=0?"#fff1f0":"#f6ffed"; roiHtml=`<span style="font-size:0.8em;font-weight:bold;color:${c};background:${bg};padding:2px 8px;border-radius:8px;">${roi>=0?"▲":"▼"} ${roi>=0?"+":""}${roi.toFixed(1)}% · ${pnl>=0?"+":"-"}$${Math.abs(Math.round(pnl)).toLocaleString()}</span>`; }
+        else roiHtml='<span style="font-size:0.8em;color:#bbb;background:#f7f7f7;padding:2px 8px;border-radius:8px;">報酬 —</span>';
+        const pill=isETF?'<span style="font-size:0.72em;color:#1565c0;background:#e6f2ff;padding:1px 7px;border-radius:6px;margin-left:6px;">ETF</span>':'<span style="font-size:0.72em;color:#888;background:#f2f2f2;padding:1px 7px;border-radius:6px;margin-left:6px;">個股</span>';
+        return `<div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:12px 14px;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+                <span><span style="font-size:1.05em;font-weight:bold;color:#333;">${code}</span>${sname?`<span style="font-size:0.82em;color:#999;margin-left:6px;">${sname}</span>`:""}${pill}</span>
+                <span style="font-size:1.15em;font-weight:bold;color:#333;white-space:nowrap;">$${Math.round(d.mv).toLocaleString()}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap;">
+                <span style="font-size:0.85em;color:#999;">${d.qty.toLocaleString()} ${unit}</span>
+                <span style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">${dayHtml}${roiHtml}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:9px;">
+                <div style="flex:1;height:5px;background:#f0f0f0;border-radius:3px;overflow:hidden;"><div style="width:${w.toFixed(1)}%;height:100%;background:${d.color};border-radius:3px;"></div></div>
+                <span style="font-size:0.75em;color:#999;min-width:62px;text-align:right;">佔投資 ${w.toFixed(1)}%</span>
+            </div>
+        </div>`;
+    }).join("");
+    if(totalEl) totalEl.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:10px 14px;background:#fafafa;border-radius:8px;"><span style="font-size:0.9em;color:#888;">投資合計</span><span style="font-size:1.05em;font-weight:bold;color:#333;">$${Math.round(investMV).toLocaleString()}</span></div>`;
+}
+
 // 功能 4：資產圖
 function loadAssetChart() {
     Promise.all([fetchTab('Portfolio'), fetchTab('Asset_Log'), fetchTab('Expenses_DB')]).then(([portfolioData, logData, expData]) => {
@@ -1407,7 +1447,7 @@ function loadAssetChart() {
         });
 
         const palette=['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40','#C9CBCF','#E7E9ED','#76D7C4','#F1948A'];
-        let labels=[], values=[], colors=[], tableHtml="", beta=null;
+        let labels=[], values=[], colors=[], holdRows=[], beta=null;
         globalSnapshotData=[];
 
         portfolioData.forEach((row, i) => {
@@ -1426,16 +1466,12 @@ function loadAssetChart() {
             if(mv>0){labels.push(name);values.push(mv);colors.push(palette[i%palette.length]);}
             let cost=isCash?mv:(itemCostMap[name]||0);
             globalSnapshotData.push({item:name,qty,mv,cost});
-            let unit=name.match(/00|Stock/)?"股":name.match(/BTC|ETH/)?"顆":name.match(/黃金/)?"克":isCash?"元":"單位";
             let dc=(pNow-pYest)*qty, showDc=dc!==0&&Math.abs(pNow-1)>0.01&&!isCash;
             if(!isCash&&qty>0&&pYest>1&&pNow>0) todayPnL+=dc; // 今日損益：排除現金與沒有有效昨收(=1 佔位)的列
-            let dcColor=dc>0?"#ff4d4f":dc<0?"#52c41a":"#999";
-            let dcText=showDc?`<div style="color:${dcColor};font-size:0.85em;margin-top:3px;">${dc>0?"▲ +":"▼ "}$${Math.abs(Math.round(dc)).toLocaleString()}</div>`:`<div style="color:#ccc;font-size:0.8em;margin-top:3px;">-</div>`;
-            let rc=mv<0?"#e91e63":"inherit", dc2=mv>0?palette[i%palette.length]:"#e91e63";
-            tableHtml+=`<tr style="border-bottom:1px solid #eee;"><td style="padding:12px 5px;font-weight:bold;color:#333;"><span style="display:inline-block;width:10px;height:10px;background:${dc2};margin-right:5px;border-radius:50%;"></span>${name}</td><td style="padding:12px 5px;text-align:right;color:#555;">${qty.toLocaleString()} <span style="font-size:0.8em;color:#999;">${unit}</span></td><td style="padding:12px 5px;text-align:right;"><div style="font-weight:bold;color:${rc};">$${mv.toLocaleString()}</div>${dcText}</td></tr>`;
+            if(!isCash) holdRows.push({name, qty, mv, cost, dc, showDc, color:palette[i%palette.length]}); // 持股明細只列投資部位(不含現金)
         });
 
-        document.getElementById('holdingsTableBody').innerHTML=tableHtml||"<tr><td colspan='3' style='text-align:center;'>無資產</td></tr>";
+        renderHoldings(holdRows, investMV);
         globalTotalAssets=totalAssets;
         document.getElementById('totalAssetsDisplay').innerText="$"+totalAssets.toLocaleString();
         let tEl=document.getElementById('todayPnlDisplay');
