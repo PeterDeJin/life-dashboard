@@ -914,7 +914,9 @@ function drawVsChart(ctx, labels, mine, mkt){
 }
 function loadVsMarket(){
     const ctx=document.getElementById('vsMarketChart'); if(!ctx) return;
-    const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    // 月底統計 + 月線資料，一律用「年-月」對齊，避開 Yahoo 月線 timestamp 落在次月 00:00(台灣時間)造成的日期偏移
+    const tsYM=ts=>{ let d=new Date(ts*1000); return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0'); };
+    const dsYM=ds=>{ let m=String(ds).replace(/\//g,'-').match(/^(\d{4})-(\d{1,2})/); return m?m[1]+'-'+String(+m[2]).padStart(2,'0'):null; };
     fetchTab('History_Log').then(hist=>{
         if(!Array.isArray(hist)) return;
         let pts=[];
@@ -928,8 +930,8 @@ function loadVsMarket(){
         const url=API_URL+'?action=getMarketData&period1='+Math.floor(pts[0].t/1000)+'&period2='+Math.floor(Date.now()/1000);
         fetch(url).then(r=>r.json()).then(j=>{
             const res=j&&j.chart&&j.chart.result&&j.chart.result[0]; let twii={};
-            if(res&&res.timestamp){ const cl=res.indicators.quote[0].close; res.timestamp.forEach((ts,i)=>{ if(cl[i]!=null) twii[ymd(new Date(ts*1000))]=cl[i]; }); }
-            const twiiOn=ds=>{ let d=new Date(ds+'T00:00:00'); for(let i=0;i<7;i++){ let k=ymd(d); if(twii[k]!=null) return twii[k]; d.setDate(d.getDate()-1); } return null; };
+            if(res&&res.timestamp){ const cl=res.indicators.quote[0].close; res.timestamp.forEach((ts,i)=>{ if(cl[i]!=null) twii[tsYM(ts)]=cl[i]; }); }
+            const twiiOn=ds=>{ let k=dsYM(ds); return (k&&twii[k]!=null)?twii[k]:null; };
             const base=pts[0].v, tBase=twiiOn(pts[0].ds);
             let labels=[], mine=[], mkt=[];
             pts.forEach(p=>{ labels.push(p.ds); mine.push(+(((p.v/base)-1)*100).toFixed(2)); let tc=twiiOn(p.ds); mkt.push((tc&&tBase)?+(((tc/tBase)-1)*100).toFixed(2):null); });
