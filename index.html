@@ -914,8 +914,8 @@ function drawVsChart(ctx, labels, mine, mkt){
 }
 function loadVsMarket(){
     const ctx=document.getElementById('vsMarketChart'); if(!ctx) return;
-    // 月底統計 + 月線資料，一律用「年-月」對齊，避開 Yahoo 月線 timestamp 落在次月 00:00(台灣時間)造成的日期偏移
-    const tsYM=ts=>{ let d=new Date(ts*1000); return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0'); };
+    // 月底統計 + 月線資料，一律用「台灣年-月」對齊。Yahoo 月K 的 close 是當月收盤，但時間戳落在該月月初(台灣時間)，故強制以 UTC+8 取年月，避免時區偏移導致整條錯位一個月
+    const tsYM=ts=>{ let d=new Date((ts+8*3600)*1000); return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0'); };
     const dsYM=ds=>{ let m=String(ds).replace(/\//g,'-').match(/^(\d{4})-(\d{1,2})/); return m?m[1]+'-'+String(+m[2]).padStart(2,'0'):null; };
     fetchTab('History_Log').then(hist=>{
         if(!Array.isArray(hist)) return;
@@ -927,7 +927,7 @@ function loadVsMarket(){
         });
         let byd={}; pts.forEach(p=>byd[p.ds]=p); pts=Object.values(byd).sort((a,b)=>a.t-b.t);
         if(pts.length<2) return; // 至少要兩次快照才比得了
-        const url=API_URL+'?action=getMarketData&period1='+Math.floor(pts[0].t/1000)+'&period2='+Math.floor(Date.now()/1000);
+        const url=API_URL+'?action=getMarketData&period1='+(Math.floor(pts[0].t/1000)-45*86400)+'&period2='+Math.floor(Date.now()/1000); // period1 往前推 45 天，確保第一個快照所在月份的月K(時間戳在月初)不被漏抓
         fetch(url).then(r=>r.json()).then(j=>{
             const res=j&&j.chart&&j.chart.result&&j.chart.result[0]; let twii={};
             if(res&&res.timestamp){ const cl=res.indicators.quote[0].close; res.timestamp.forEach((ts,i)=>{ if(cl[i]!=null) twii[tsYM(ts)]=cl[i]; }); }
