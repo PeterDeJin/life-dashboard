@@ -50,8 +50,10 @@ function doGet(e) {
   // 從後端代抓 Yahoo Finance 月線，避免前端 CORS 問題
   if (e.parameter.action === 'getMarketData') {
     var p1 = e.parameter.period1, p2 = e.parameter.period2;
+    var sym = e.parameter.symbol || '^TWII'; // 預設加權指數，前端可傳 0050.TW 等
     try {
-      var url = 'https://query1.finance.yahoo.com/v8/finance/chart/%5ETWII?interval=1mo&period1=' + p1 + '&period2=' + p2;
+      var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym)
+              + '?interval=1mo&period1=' + encodeURIComponent(p1) + '&period2=' + encodeURIComponent(p2);
       var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
       return ContentService.createTextOutput(resp.getContentText()).setMimeType(ContentService.MimeType.JSON);
     } catch(err) {
