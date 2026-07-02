@@ -47,6 +47,18 @@ function buildRowByHeader(headers, schema, payload) {
 // 1. 讀取資料（給網頁抓資料用）
 // ---------------------------------------------------------
 function doGet(e) {
+  // 從後端代抓 Yahoo Finance 月線，避免前端 CORS 問題
+  if (e.parameter.action === 'getMarketData') {
+    var p1 = e.parameter.period1, p2 = e.parameter.period2;
+    try {
+      var url = 'https://query1.finance.yahoo.com/v8/finance/chart/%5ETWII?interval=1mo&period1=' + p1 + '&period2=' + p2;
+      var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      return ContentService.createTextOutput(resp.getContentText()).setMimeType(ContentService.MimeType.JSON);
+    } catch(err) {
+      return outJson({ error: err.message });
+    }
+  }
+
   var tabName = e.parameter.tab;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = tabName ? ss.getSheetByName(tabName) : ss.getSheets()[0];

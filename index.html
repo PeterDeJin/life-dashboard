@@ -906,6 +906,12 @@ function calQuickAddEvent(key){
 }
 
 // ========== 我的資產 vs 大盤 ==========
+function drawVsChart(ctx, labels, mine, mkt){
+    if(vsChart) vsChart.destroy();
+    const datasets=[{label:'我的資產',data:mine,borderColor:'#2a5298',backgroundColor:'rgba(42,82,152,0.10)',fill:true,tension:0.2,pointRadius:3}];
+    if(mkt&&mkt.length) datasets.push({label:'加權指數',data:mkt,borderColor:'#e91e63',borderDash:[5,4],tension:0.2,pointRadius:2});
+    vsChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:{y:{ticks:{callback:v=>v+'%'}}},plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.dataset.label+'：'+(c.parsed.y==null?'-':(c.parsed.y>=0?'+':'')+c.parsed.y+'%')}}}}});
+}
 function loadVsMarket(){
     const ctx=document.getElementById('vsMarketChart'); if(!ctx) return;
     const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -919,20 +925,20 @@ function loadVsMarket(){
         });
         let byd={}; pts.forEach(p=>byd[p.ds]=p); pts=Object.values(byd).sort((a,b)=>a.t-b.t);
         if(pts.length<2) return; // 至少要兩次快照才比得了
-        const url='https://query1.finance.yahoo.com/v8/finance/chart/%5ETWII?interval=1d&period1='+Math.floor(pts[0].t/1000)+'&period2='+Math.floor(Date.now()/1000);
-        fetch(url,{headers:{'User-Agent':'Mozilla/5.0'}}).then(r=>r.json()).then(j=>{
+        const url=API_URL+'?action=getMarketData&period1='+Math.floor(pts[0].t/1000)+'&period2='+Math.floor(Date.now()/1000);
+        fetch(url).then(r=>r.json()).then(j=>{
             const res=j&&j.chart&&j.chart.result&&j.chart.result[0]; let twii={};
             if(res&&res.timestamp){ const cl=res.indicators.quote[0].close; res.timestamp.forEach((ts,i)=>{ if(cl[i]!=null) twii[ymd(new Date(ts*1000))]=cl[i]; }); }
             const twiiOn=ds=>{ let d=new Date(ds+'T00:00:00'); for(let i=0;i<7;i++){ let k=ymd(d); if(twii[k]!=null) return twii[k]; d.setDate(d.getDate()-1); } return null; };
             const base=pts[0].v, tBase=twiiOn(pts[0].ds);
             let labels=[], mine=[], mkt=[];
             pts.forEach(p=>{ labels.push(p.ds); mine.push(+(((p.v/base)-1)*100).toFixed(2)); let tc=twiiOn(p.ds); mkt.push((tc&&tBase)?+(((tc/tBase)-1)*100).toFixed(2):null); });
-            if(vsChart) vsChart.destroy();
-            vsChart=new Chart(ctx,{type:'line',data:{labels,datasets:[
-                {label:'我的資產',data:mine,borderColor:'#2a5298',backgroundColor:'rgba(42,82,152,0.10)',fill:true,tension:0.2,pointRadius:3},
-                {label:'加權指數',data:mkt,borderColor:'#e91e63',borderDash:[5,4],tension:0.2,pointRadius:2}
-            ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:{y:{ticks:{callback:v=>v+'%'}}},plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.dataset.label+'：'+(c.parsed.y==null?'-':(c.parsed.y>=0?'+':'')+c.parsed.y+'%')}}}}});
-        }).catch(()=>{});
+            drawVsChart(ctx, labels, mine, mkt);
+        }).catch(()=>{ // Yahoo Finance CORS 失敗時，仍畫出資產線
+            const base=pts[0].v; let labels=[], mine=[];
+            pts.forEach(p=>{ labels.push(p.ds); mine.push(+(((p.v/base)-1)*100).toFixed(2)); });
+            drawVsChart(ctx, labels, mine, []);
+        });
     }).catch(()=>{});
 }
 
