@@ -141,7 +141,8 @@
             </div>
             <div id="eventForm" style="display:none;background:rgba(0,0,0,0.2);padding:15px;border-radius:10px;margin-bottom:15px;flex-direction:column;gap:10px;">
                 <input type="text" id="evtTitle" placeholder="名稱" style="padding:8px;border-radius:5px;border:none;">
-                <input type="text" id="evtDate" placeholder="日期 (YYYY-MM-DD)" style="padding:8px;border-radius:5px;border:none;">
+                <input type="text" id="evtDate" placeholder="開始日期 (YYYY-MM-DD)" style="padding:8px;border-radius:5px;border:none;">
+                <input type="text" id="evtDateEnd" placeholder="結束日期 (選填，跨天才填)" style="padding:8px;border-radius:5px;border:none;">
                 <select id="evtType" style="padding:8px;border-radius:5px;border:none;"><option value="fixed">一次性</option><option value="yearly">每年重複</option></select>
                 <button onclick="submitEvent(this)" style="background:#4ca1af;color:white;">新增</button>
             </div>
@@ -169,10 +170,12 @@
             <h2>✅ 待辦事項</h2>
             <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
                 <input type="text" id="todoTitle" placeholder="要做什麼？" style="padding:10px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;">
-                <div style="display:flex;gap:8px;">
-                    <input type="date" id="todoDue" style="flex:1;padding:10px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;">
-                    <select id="todoPriority" style="flex:1;padding:10px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;"><option value="高">🔴 高</option><option value="中" selected>🟡 中</option><option value="低">🟢 低</option></select>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <input type="date" id="todoDue" title="開始日" style="flex:1;padding:10px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;">
+                    <span style="color:#999;font-size:0.9em;">~</span>
+                    <input type="date" id="todoDueEnd" title="結束日（選填，跨天才填）" style="flex:1;padding:10px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;">
                 </div>
+                <select id="todoPriority" style="padding:10px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;"><option value="高">🔴 高</option><option value="中" selected>🟡 中</option><option value="低">🟢 低</option></select>
                 <button onclick="submitTodo(this)" style="background:#3f51b5;width:100%;">新增</button>
             </div>
             <div id="todoList" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;">載入中...</div>
@@ -719,10 +722,11 @@ function _isDone(v){ return ['TRUE','是','1','Y','YES','V','✓','DONE','ON'].i
 function submitTodo(btn){
     const title = document.getElementById('todoTitle').value.trim();
     if(!title){ toast("請輸入任務",'error'); return; }
-    const due = document.getElementById('todoDue').value, prio = document.getElementById('todoPriority').value;
+    let due = document.getElementById('todoDue').value; const dueEnd = document.getElementById('todoDueEnd').value, prio = document.getElementById('todoPriority').value;
+    if(due && dueEnd) due=due+'~'+dueEnd; else if(!due && dueEnd) due=dueEnd; // 跨天：以「開始~結束」存進同一欄
     btn.disabled=true;
     apiPost({tab:"Todo_DB",title,due,priority:prio,done:false,id:newId()}).then(d=>{
-        if(d.includes("Success")){ toast("✅ 已新增",'success'); document.getElementById('todoTitle').value=""; document.getElementById('todoDue').value=""; invalidateCache('Todo_DB'); loadTodos(); loadCalendar(); }
+        if(d.includes("Success")){ toast("✅ 已新增",'success'); document.getElementById('todoTitle').value=""; document.getElementById('todoDue').value=""; document.getElementById('todoDueEnd').value=""; invalidateCache('Todo_DB'); loadTodos(); loadCalendar(); }
         else toast("失敗："+d,'error');
         btn.disabled=false;
     }).catch(()=>{ toast("連線錯誤，請重試",'error'); btn.disabled=false; });
@@ -733,14 +737,24 @@ function loadTodos(){
         if(!Array.isArray(data)){ c.innerHTML="<div style='color:#ccc;font-size:0.85em;'>尚未設定（請在 Sheet 開 Todo_DB 分頁：任務、截止日、優先、完成、ID）</div>"; return; }
         let items=data.filter(r=>!_isDone(r.完成) && String(r.任務||r.項目||"").trim());
         const today=new Date(); today.setHours(0,0,0,0);
-        const ts=r=>{ if(!r.截止日) return Infinity; let d=new Date(String(r.截止日).replace(/\//g,'-')); return isNaN(d)?Infinity:d.getTime(); };
+        const ts=r=>{ let rg=parseDateRange(r.截止日); return rg?rg.s.getTime():Infinity; };
         items.sort((a,b)=>{ let d=ts(a)-ts(b); if(d!==0) return d; let pa=PRIO_RANK[a.優先]!==undefined?PRIO_RANK[a.優先]:1, pb=PRIO_RANK[b.優先]!==undefined?PRIO_RANK[b.優先]:1; return pa-pb; });
         if(!items.length){ c.innerHTML="<div style='color:#bbb;text-align:center;padding:12px;'>沒有待辦，讚 🎉</div>"; return; }
         c.innerHTML=items.map(r=>{
             const id=esc(r.ID!==undefined?r.ID:""), title=esc(r.任務||r.項目||"");
             const prio=String(r.優先||"中"), dot=prio==="高"?"🔴":prio==="低"?"🟢":"🟡";
             let dueTxt="";
-            if(r.截止日){ let dd=new Date(String(r.截止日).replace(/\//g,'-')); if(!isNaN(dd)){ let diff=Math.round((dd-today)/86400000); let col=diff<0?"#e53935":diff===0?"#fb8c00":"#888"; let t=diff<0?`逾期 ${-diff} 天`:diff===0?"今天到期":`還有 ${diff} 天`; dueTxt=`<br><span style="font-size:0.8em;color:${col};">${esc(formatDate(r.截止日))}・${t}</span>`; } }
+            if(r.截止日){ let rg=parseDateRange(r.截止日); if(rg){ let multi=(rg.e>rg.s), diff=Math.round((rg.s-today)/86400000), endDiff=Math.round((rg.e-today)/86400000), col, t;
+                if(multi){
+                    if(endDiff<0){ col="#e53935"; t=`已結束 ${-endDiff} 天`; }
+                    else if(rg.s<=today){ col="#fb8c00"; t="進行中"; }
+                    else { col="#888"; t=`${diff} 天後開始`; }
+                    dueTxt=`<br><span style="font-size:0.8em;color:${col};">${esc(formatDate(rg.s))} ~ ${esc(formatDate(rg.e))}・${t}</span>`;
+                } else {
+                    col=diff<0?"#e53935":diff===0?"#fb8c00":"#888"; t=diff<0?`逾期 ${-diff} 天`:diff===0?"今天到期":`還有 ${diff} 天`;
+                    dueTxt=`<br><span style="font-size:0.8em;color:${col};">${esc(formatDate(rg.s))}・${t}</span>`;
+                }
+            } }
             return `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f9fa;border-radius:8px;"><span class="todo-check" data-id="${id}" style="cursor:pointer;font-size:1.2em;">⬜</span><div style="flex:1;color:#333;">${dot} ${title}${dueTxt}</div><button class="todo-del" data-id="${id}" style="background:#ffebee;color:#c62828;padding:4px 8px;font-size:0.8rem;border-radius:5px;box-shadow:none;border:1px solid #ffcdd2;">🗑️</button></div>`;
         }).join('');
     }).catch(()=>{ c.innerHTML="<div style='color:#ccc;'>讀取失敗</div>"; });
@@ -803,21 +817,39 @@ function loadMood(){
 // ========== 行事曆 ==========
 let calYear, calMonth, calSelected=null, calTodoMap={}, calEvents=[], calRecs=[];
 function calKey(y,m,d){ return y+'/'+String(m+1).padStart(2,'0')+'/'+String(d).padStart(2,'0'); }
+// 解析日期欄：支援「開始~結束」跨天區間，回傳 {s:起始, e:結束}(單日則兩者同天)；解析失敗回傳 null
+function parseDateRange(v){
+    if(!v) return null;
+    const parts=String(v).replace(/\//g,'-').split(/\s*[~～]\s*/);
+    const mk=str=>{ let p=str.split('T')[0].split('-'); if(p.length<3) return null; let d=new Date(+p[0],+p[1]-1,+p[2]); return isNaN(d)?null:d; };
+    let s=mk(parts[0]); if(!s) return null;
+    let e=(parts[1]&&mk(parts[1]))||s;
+    if(e<s){ const x=s; s=e; e=x; } // 起訖顛倒就自動交換
+    return {s,e};
+}
 function buildCalData(){
     return Promise.all([fetchTab('Todo_DB'),fetchTab('Events_DB'),fetchTab('Recurring_DB')]).then(([todos,events,recs])=>{
         calTodoMap={};
         (Array.isArray(todos)?todos:[]).forEach(r=>{
             if(_isDone(r.完成)) return;
             const t=String(r.任務||r.項目||'').trim(); if(!t||!r.截止日) return;
-            let d=new Date(String(r.截止日).replace(/\//g,'-')); if(isNaN(d)) return;
-            const pr=String(r.優先||'中'), col=pr==='高'?'#e53935':pr==='低'?'#4caf50':'#fbc02d';
-            const k=calKey(d.getFullYear(),d.getMonth(),d.getDate());
-            (calTodoMap[k]=calTodoMap[k]||[]).push({label:'✅ '+t,color:col});
+            const rg=parseDateRange(r.截止日); if(!rg) return;
+            const pr=String(r.優先||'中'), col=pr==='高'?'#e53935':pr==='低'?'#4caf50':'#fbc02d', multi=(rg.e>rg.s);
+            let guard=0;
+            for(let dt=new Date(rg.s); dt<=rg.e && guard<400; dt.setDate(dt.getDate()+1), guard++){ // 跨天代辦：區間內每天標記(上限保護避免填錯造成爆量)
+                const tag=multi?(dt.getTime()===rg.s.getTime()?'（始）':dt.getTime()===rg.e.getTime()?'（迄）':''):'';
+                const k=calKey(dt.getFullYear(),dt.getMonth(),dt.getDate());
+                (calTodoMap[k]=calTodoMap[k]||[]).push({label:'✅ '+t+tag,color:col});
+            }
         });
         calEvents=(Array.isArray(events)?events:[]).map(r=>{
             const t=String(r.事件名稱||r.title||'').trim(); const dv=r.日期||r.date; if(!t||!dv) return null;
-            let p=String(dv).replace(/\//g,'-').split('T')[0].split('-'); if(p.length<3) return null;
-            return {y:+p[0],m:+p[1]-1,d:+p[2],type:String(r.類型||r.type||'fixed').toLowerCase().trim(),title:t};
+            const rg=parseDateRange(dv); if(!rg) return null;
+            const type=String(r.類型||r.type||'fixed').toLowerCase().trim();
+            const di=dt=>(dt.getFullYear()*100+dt.getMonth()+1)*100+dt.getDate();
+            const ev={y:rg.s.getFullYear(),m:rg.s.getMonth(),d:rg.s.getDate(),type,title:t};
+            if(type!=='yearly' && rg.e>rg.s){ ev.start=di(rg.s); ev.end=di(rg.e); } // 跨天：記錄起訖 yyyymmdd 供區間比對
+            return ev;
         }).filter(Boolean);
         calRecs=(Array.isArray(recs)?recs:[]).map(r=>{
             const on=['TRUE','是','1','Y','YES','ON',''].indexOf(String(r.啟用!==undefined?r.啟用:'TRUE').trim().toUpperCase())>=0;
@@ -847,7 +879,11 @@ function calItems(y,m,d){
     const hol=(holidayCache[y]||{})[calKey(y,m,d)];
     if(hol) arr.push({label:(hol.holiday?'🎌 ':'💼 ')+hol.name, color:hol.holiday?'#d32f2f':'#8d6e63'});
     arr=arr.concat(calTodoMap[calKey(y,m,d)]||[]);
-    calEvents.forEach(e=>{ if(e.m===m && e.d===d && (e.type==='yearly' || e.y===y)) arr.push({label:'🎯 '+e.title,color:'#9c27b0'}); });
+    const cur=(y*100+(m+1))*100+d;
+    calEvents.forEach(e=>{
+        if(e.start!=null){ if(cur>=e.start && cur<=e.end) arr.push({label:'📆 '+e.title+(cur===e.start?'（始）':cur===e.end?'（迄）':''),color:'#9c27b0'}); } // 跨天事件：區間內每天標記
+        else if(e.m===m && e.d===d && (e.type==='yearly' || e.y===y)) arr.push({label:'🎯 '+e.title,color:'#9c27b0'});
+    });
     const last=new Date(y,m+1,0).getDate();
     calRecs.forEach(r=>{ if(Math.min(r.day,last)===d) arr.push({label:'💸 '+r.title+(r.amt?(' $'+r.amt.toLocaleString()):''),color:'#e91e63'}); });
     return arr;
@@ -895,12 +931,14 @@ function loadCalendar(){
 function calQuickAddTodo(key){
     cancelEditExpense();
     document.getElementById('todoDue').value=key.replace(/\//g,'-');
+    document.getElementById('todoDueEnd').value='';
     const el=document.getElementById('todoTitle'); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.focus(); }
     toast('已帶入日期，輸入任務按「新增」即可','info');
 }
 function calQuickAddEvent(key){
     const f=document.getElementById('eventForm'); if(f && f.style.display==='none') toggleEventForm();
     document.getElementById('evtDate').value=key.replace(/\//g,'-');
+    document.getElementById('evtDateEnd').value='';
     const el=document.getElementById('evtTitle'); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.focus(); }
     toast('已帶入日期，輸入事件名稱按「新增」即可','info');
 }
@@ -1842,12 +1880,14 @@ function loadMediaList(){
 // 功能 16：時間倒數
 function toggleEventForm(){const f=document.getElementById('eventForm');f.style.display=f.style.display==="none"?"flex":"none";}
 function submitEvent(btn){
-    const title=document.getElementById('evtTitle').value, date=document.getElementById('evtDate').value, type=document.getElementById('evtType').value;
-    if(!title||!date){toast("請輸入名稱與日期",'error');return;}
+    const title=document.getElementById('evtTitle').value.trim(); let date=document.getElementById('evtDate').value.trim();
+    const end=document.getElementById('evtDateEnd').value.trim(), type=document.getElementById('evtType').value;
+    if(!title||!date){toast("請輸入名稱與開始日期",'error');return;}
+    if(end) date=date+'~'+end; // 跨天：以「開始~結束」存進同一個日期欄，後端不用改
     btn.innerText="寫入中...";btn.disabled=true;
     const reset=()=>{btn.innerText="新增";btn.disabled=false;};
     apiPost({tab:"Events_DB",title,date,type}).then(data=>{
-        if(data.includes("Success")){toast("🎉 新增成功！",'success');document.getElementById('evtTitle').value="";toggleEventForm();invalidateCache('Events_DB');loadTimeWidget();loadCalendar();}
+        if(data.includes("Success")){toast("🎉 新增成功！",'success');document.getElementById('evtTitle').value="";document.getElementById('evtDateEnd').value="";toggleEventForm();invalidateCache('Events_DB');loadTimeWidget();loadCalendar();}
         else toast("失敗："+data,'error');
         reset();
     }).catch(()=>{toast("連線錯誤，請重試",'error');reset();});
@@ -1861,14 +1901,18 @@ function loadTimeWidget(){
         if(!data.length){container.innerHTML=html+"<div style='text-align:center;font-size:0.8em;opacity:0.7;margin-top:10px;'>尚無倒數事件</div>";return;}
         data.forEach(evt=>{
             let title=evt['事件名稱']||evt['title'], date=evt['日期']||evt['date'], type=String(evt['類型']||evt['type']||"fixed").toLowerCase().trim();
-            let p=String(date).replace(/\//g,"-").split("T")[0].split("-");
-            let td=new Date(+p[0],+p[1]-1,+p[2]);
-            if(type==="yearly"){td.setFullYear(yr);if(td<now) td.setFullYear(yr+1);}
-            let diff=Math.floor((td-now)/86400000);
-            if(diff<0&&type!=="yearly") return;
-            let dayText=diff===0?"🎉 就是今天！":diff>0?`${diff} <span style="font-size:0.6em;">天</span>`:"已結束";
-            let dayColor=diff===0?"#4ade80":diff>0?"#ffeb3b":"#ccc";
-            html+=`<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.1);padding:10px 15px;border-radius:10px;"><div><div style="font-size:0.85em;opacity:0.8;">${esc(title)}</div><div style="font-size:1.1em;font-weight:bold;">${formatDate(td)}</div></div><div style="text-align:right;"><div style="font-size:0.85em;opacity:0.8;">${diff===0?"Status":"還剩下"}</div><div style="font-size:1.5em;font-weight:bold;color:${dayColor};">${dayText}</div></div></div>`;
+            let rg=parseDateRange(date); if(!rg) return;
+            let sd=new Date(rg.s.getFullYear(),rg.s.getMonth(),rg.s.getDate()), ed=new Date(rg.e.getFullYear(),rg.e.getMonth(),rg.e.getDate());
+            if(type==="yearly"){sd.setFullYear(yr);if(sd<now) sd.setFullYear(yr+1);ed=sd;}
+            let diff=Math.floor((sd-now)/86400000), multi=(rg.e>rg.s), inProg=(sd<=now&&now<=ed);
+            if(ed<now&&type!=="yearly") return; // 整段都過了才隱藏
+            let dayText,dayColor;
+            if(inProg&&multi){dayText="進行中";dayColor="#4ade80";}
+            else if(diff===0){dayText="🎉 就是今天！";dayColor="#4ade80";}
+            else if(diff>0){dayText=`${diff} <span style="font-size:0.6em;">天</span>`;dayColor="#ffeb3b";}
+            else{dayText="已結束";dayColor="#ccc";}
+            let dateLabel=multi?(formatDate(sd)+' ~ '+formatDate(ed)):formatDate(sd);
+            html+=`<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.1);padding:10px 15px;border-radius:10px;"><div><div style="font-size:0.85em;opacity:0.8;">${esc(title)}</div><div style="font-size:1.1em;font-weight:bold;">${dateLabel}</div></div><div style="text-align:right;"><div style="font-size:0.85em;opacity:0.8;">${inProg&&multi?"狀態":(diff===0?"Status":"還剩下")}</div><div style="font-size:1.5em;font-weight:bold;color:${dayColor};">${dayText}</div></div></div>`;
         });
         container.innerHTML=html;
     }).catch(()=>{container.innerHTML=html;});
