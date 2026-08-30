@@ -547,9 +547,10 @@ const FIN = {
     accounts: [
         { v:'錢包',       label:'現金錢包',   living:true },
         { v:'中國信託',                       living:true },
+        { v:'華南銀行',                       living:true },
         { v:'悠遊卡',                         living:true },
-        { v:'icash',                          living:true },
-        { v:'ipassmoney', label:'iPass Money', living:true },
+        { v:'icash',                         living:true },
+        { v:'ipassmoney', label:'Line Pay',  living:true },
         { v:'學生證',                         living:true },
         { v:'一卡通',                         living:true, calcOnly:true }, // 只計入生活可用，不出現在表單
         { v:'郵局' },
@@ -564,12 +565,12 @@ function accLabel(v) { const a = FIN.accounts.find(x => x.v === v); return (a &&
 
 // 各下拉選單的選項（值統一參照上面的帳戶名）
 const OPTIONS = {
-    expAccount:    ['錢包','中國信託','悠遊卡','icash','ipassmoney','學生證','郵局','待付款'],
-    transFrom:     ['郵局','富邦銀行','中國信託','錢包'],
-    transTo:       ['錢包','悠遊卡','icash','ipassmoney','學生證','待付款','富邦證券','中國信託','郵局','富邦銀行'],
-    assetAccount:  ['富邦證券','郵局','富邦銀行'],
+    expAccount:    ['錢包','中國信託','華南銀行','悠遊卡','icash','ipassmoney','學生證','郵局','待付款'],
+    transFrom:     ['郵局','富邦銀行','中國信託','華南銀行','錢包'],
+    transTo:       ['錢包','悠遊卡','icash','ipassmoney','學生證','待付款','富邦證券','中國信託','郵局','富邦銀行','華南銀行'],
+    assetAccount:  ['富邦證券','郵局','富邦銀行','華南銀行'],
     assetCategory: ['股票','現金','加密貨幣'],
-    filterAccounts:['錢包','中國信託','學生證','郵局','富邦銀行','悠遊卡','icash','ipassmoney','待付款'],
+    filterAccounts:['錢包','中國信託','華南銀行','學生證','郵局','富邦銀行','悠遊卡','icash','ipassmoney','待付款'],
 };
 
 Chart.register(ChartDataLabels);
