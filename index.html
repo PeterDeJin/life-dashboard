@@ -85,7 +85,7 @@
         body.dark [style*="color:#333"], body.dark [style*="color: #333"] { color: #ececec !important; }
         body.dark [style*="color:#555"], body.dark [style*="color:#444"], body.dark [style*="color:#666"] { color: #c2c2c2 !important; }
         body.dark [style*="color:#888"], body.dark [style*="color:#999"], body.dark [style*="color:#aaa"] { color: #9e9e9e !important; }
-        body.dark [style*="background:#f8f9fa"], body.dark [style*="background:#f9f9f9"], body.dark [style*="background:#f0f0f0"], body.dark [style*="background:#fff3e0"], body.dark [style*="background:#f0f4f8"], body.dark [style*="background:#fff3cd"], body.dark [style*="background:#fce4ec"] { background: #262626 !important; }
+        body.dark [style*="background:#f8f9fa"], body.dark [style*="background:#f9f9f9"], body.dark [style*="background:#f0f0f0"], body.dark [style*="background:#fff3e0"], body.dark [style*="background:#f0f4f8"], body.dark [style*="background:#fff3cd"], body.dark [style*="background:#fce4ec"], body.dark [style*="background:#fafafa"] { background: #262626 !important; }
         body.dark [style*="background:white"], body.dark [style*="background:#fff"] { background: #1e1e1e !important; }
         body.dark [style*="solid #eee"], body.dark [style*="solid #f0f0f0"], body.dark [style*="solid #ddd"] { border-color: #333 !important; }
         /* ===== 月曆 ===== */
@@ -227,7 +227,7 @@
                     <div id="budgetMessage" style="font-size:0.8em;margin-top:5px;font-weight:bold;text-align:right;">計算中...</div>
                 </div>
                 <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.3);font-size:0.85em;">
-                    本月儲蓄率：<b id="savingsRateDisplay">...</b>
+                    本月儲蓄率：<b id="savingsRateDisplay">...</b> ・ 🎟️ 娛樂津貼：<b id="funBalanceMini">...</b>
                 </div>
             </div>
         </div>
@@ -247,7 +247,7 @@
             </div>
             <div class="asset-form">
                 <label>日期：<input type="date" id="expDate"></label>
-                <label>收支：<select id="expType"><option value="支出">支出</option><option value="收入">收入</option></select></label>
+                <label>收支：<select id="expType" onchange="syncExpForm()"><option value="支出">支出</option><option value="收入">收入</option></select></label>
                 <label>帳戶：<select id="expAccount"></select></label>
                 <label>類別：<select id="expCategory"></select></label>
                 <label>項目：<input type="text" id="expItem" placeholder="如: 午餐"></label>
@@ -293,6 +293,32 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <div class="card full-width" style="border-left:5px solid #8e24aa;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+                <h2 style="margin:0;">🎟️ 娛樂津貼</h2>
+                <div style="text-align:right;">
+                    <div style="font-size:0.8em;color:#888;">目前可花</div>
+                    <div id="funBalance" style="font-size:1.6rem;font-weight:bold;color:#8e24aa;">...</div>
+                </div>
+            </div>
+            <div id="funHint" style="font-size:0.85em;color:#666;margin:10px 0;"></div>
+            <div style="max-height:300px;overflow-y:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:0.85em;">
+                    <thead>
+                        <tr style="border-bottom:2px solid #ddd;text-align:right;">
+                            <th style="padding:6px 3px;text-align:left;">月份</th>
+                            <th style="padding:6px 3px;">花費</th>
+                            <th style="padding:6px 3px;">存入</th>
+                            <th style="padding:6px 3px;">動用</th>
+                            <th style="padding:6px 3px;">累計</th>
+                        </tr>
+                    </thead>
+                    <tbody id="funTableBody"><tr><td colspan="5" style="color:#888;padding:8px;">計算中...</td></tr></tbody>
+                </table>
+            </div>
+            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">規則：每個月結束時，「預算 − 當月花費」有剩就存進來（超支不扣）。要花這筆錢時，記帳類別選「🎟️ 娛樂津貼」，會從這裡扣、不算進當月預算。想改起算月份，在 Settings 分頁加一列「娛樂津貼起算｜2026/09」。</div>
         </div>
 
         <div class="card">
@@ -345,7 +371,7 @@
             <div style="font-size:0.8em;color:#999;margin-top:6px;">以總資產成長率對照加權指數（從第一次快照起算）。總資產含你的存入，非純投資報酬，僅供走勢對照。</div>
         </div>
 
-        <div class="row3">
+        <div class="row2">
         <div class="card">
             <h2>📊 配置比例</h2>
             <div style="height:280px;"><canvas id="assetPieChart"></canvas></div>
@@ -367,6 +393,7 @@
                 <label id="stFeeLabel">手續費：<input type="number" id="stFee" placeholder="自動計算" oninput="updateStockPreview(false)" style="width:55%;"></label>
                 <div id="stPreview" style="display:none;background:#f8f9fa;padding:15px;border-radius:10px;line-height:2;font-size:0.95em;"></div>
                 <button onclick="submitStockTrade()" id="btnStTrade" style="background:#fbc02d;color:#333;width:100%;font-size:1rem;">確認交易</button>
+                <div style="font-size:0.8em;color:#999;line-height:1.5;">⚡ 當沖不用在這裡記買賣，直接到下方「每月收入」記一筆「當沖收入」（賠錢填負數），庫存均價才不會被打亂。</div>
             </div>
             <div style="margin-top:15px;padding-top:15px;border-top:1px solid #f0f0f0;">
                 <button onclick="toggleAdvancedAsset()" style="background:none;color:#aaa;font-size:0.8rem;padding:4px 10px;box-shadow:none;border:1px solid #eee;border-radius:20px;">⚙️ 其他手動記錄（現金調整 / 加密貨幣...）</button>
@@ -385,10 +412,36 @@
             </div>
         </div>
 
-        <div class="card">
-            <h2>💵 每月收入</h2>
-            <div style="height:280px;"><canvas id="incomeSourceChart"></canvas></div>
         </div>
+
+        <div class="card full-width" style="border-left:5px solid #2a78d6;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;">
+                <h2 style="margin:0;">💵 每月收入</h2>
+                <button onclick="toggleIncomeForm()" style="background:#2a78d6;font-size:0.8rem;padding:5px 12px;">＋ 記收入</button>
+            </div>
+            <div id="incomeForm" class="asset-form" style="display:none;background:#f0f4f8;padding:15px;border-radius:10px;margin-bottom:15px;">
+                <label>日期：<input type="date" id="incDate"></label>
+                <label>類型：<select id="incType" onchange="onIncomeTypeChange()"></select></label>
+                <label>入帳帳戶：<select id="incAccount"></select></label>
+                <label>金額：<input type="number" id="incAmount" placeholder="金額"></label>
+                <label>備註：<input type="text" id="incNote" placeholder="選填，如 2330、9月薪"></label>
+                <div id="incHint" style="font-size:0.85em;color:#666;line-height:1.5;"></div>
+                <button onclick="submitIncome(this)" style="background:#2a78d6;color:white;width:100%;">記一筆收入</button>
+            </div>
+            <div class="grid-container">
+                <div style="height:280px;"><canvas id="incomeSourceChart"></canvas></div>
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <button class="quick-btn" onclick="incomeShift(-1)">‹ 上月</button>
+                        <b id="incomeMonthLabel" style="color:#333;">...</b>
+                        <button class="quick-btn" onclick="incomeShift(1)">下月 ›</button>
+                    </div>
+                    <div id="incomeMonthTotal" style="font-size:1.8rem;font-weight:bold;text-align:center;margin:10px 0 6px;color:#333;">...</div>
+                    <div id="incomeBreakdown" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:10px;"></div>
+                    <ul id="incomeRecordList" style="list-style:none;padding:0;margin:0;max-height:220px;overflow-y:auto;"></ul>
+                </div>
+            </div>
+            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">點長條可切換到那個月。收入一律用「＋ 記收入」或日常記帳選「收入」來記，類別選薪資 / 當沖收入 / 當沖退手續費 / 股利 / 利息 / 其他收入；當沖賠錢就填負數。以前記在資產流水帳（Asset_Log）的薪水、股利、買賣XXXX 也會照關鍵字算進來。</div>
         </div>
 
         <div class="card full-width">
@@ -571,13 +624,58 @@ const OPTIONS = {
     assetAccount:  ['富邦證券','郵局','富邦銀行','華南銀行'],
     assetCategory: ['股票','現金','加密貨幣'],
     filterAccounts:['錢包','中國信託','華南銀行','學生證','郵局','富邦銀行','悠遊卡','icash','ipassmoney','待付款'],
+    incAccount:    ['華南銀行','郵局','富邦銀行','中國信託','錢包'], // 收入入帳帳戶（當沖/退手續費/股利預設富邦銀行＝股票交割戶）
 };
+
+// ===== 娛樂津貼：記帳類別選它＝從娛樂津貼支出，不佔當月預算 =====
+const FUN_CAT = '娛樂津貼';
+let FUN_START = ''; // 起算月 yyyy/MM；Settings 分頁「娛樂津貼起算」可覆蓋，沒設就從第一筆記帳的月份開始
+function expenseCatOptions() { return [...FIN.categories, [FUN_CAT, '🎟️ 娛樂津貼（不算預算）']]; }
+
+// ===== 收入分類（每月收入圖、儲蓄率、總損益共用同一套規則）=====
+// 新紀錄：收支=收入，類別直接選下面的 cat（當沖收入可為負＝虧損）
+// 舊紀錄：類別不是這些時，改看項目名稱開頭或關鍵字（相容以前 Asset_Log 的「薪水」「股利」「買賣2330」等）
+// color/dark：圖表配色（固定跟著類型走，不隨排序變）
+const INCOME_KINDS = [
+    { k:'salary',   cat:'薪資',         label:'薪資',     icon:'💼', color:'#2a78d6', dark:'#3987e5', re:/薪|工讀|獎金|監考|家教|助教|打工/ },
+    { k:'daytrade', cat:'當沖收入',     label:'當沖',     icon:'⚡', color:'#eb6834', dark:'#d95926', re:/當沖|^買賣/ },
+    { k:'rebate',   cat:'當沖退手續費', label:'退手續費', icon:'↩️', color:'#1baf7a', dark:'#199e70', re:/退手續費|手續費退|退佣/ },
+    { k:'dividend', cat:'股利',         label:'股利',     icon:'🌱', color:'#eda100', dark:'#c98500', re:/股利|股息|配息/ },
+    { k:'interest', cat:'利息',         label:'利息',     icon:'🏦', color:'#e87ba4', dark:'#d55181', re:/利息/ },
+    { k:'other',    cat:'其他收入',     label:'其他',     icon:'🎁', color:'#008300', dark:'#008300', re:/^其他收入|普發/ },
+];
+const INCOME_KIND = Object.fromEntries(INCOME_KINDS.map(t => [t.k, t]));
+const INCOME_MATCH_ORDER = ['rebate','daytrade','dividend','interest','salary','other']; // 關鍵字比對順序：「當沖退手續費」要先於「當沖」
+function incomeKindOf(cat, item) {
+    cat = String(cat || '').trim(); item = String(item || '').trim();
+    let t = INCOME_KINDS.find(x => x.cat === cat); if (t) return t.k;
+    if (!item || /^轉入|^轉出|領錢|存錢|換匯/.test(item)) return null; // 轉帳不是收入
+    t = INCOME_KINDS.find(x => item.startsWith(x.cat)); if (t) return t.k;
+    const k = INCOME_MATCH_ORDER.find(k => INCOME_KIND[k].re.test(item));
+    return k || null;
+}
+// 收集所有收入紀錄：Asset_Log（舊，金額帶正負）＋ Expenses_DB 收支=收入（新）
+function collectIncome(logData, expData) {
+    const out = [];
+    (Array.isArray(logData) ? logData : []).forEach(r => {
+        const kind = incomeKindOf('', fItem(r)); if (!kind) return;
+        const ym = ymOf(r.日期), amt = n(r.金額); if (!ym || !amt) return;
+        out.push({ src:'asset', ym, date:formatDate(r.日期), kind, item:String(fItem(r)), acc:String(r.帳戶 || ''), amt });
+    });
+    (Array.isArray(expData) ? expData : []).forEach(r => {
+        if (r.收支 !== '收入') return;
+        const kind = incomeKindOf(fCategory(r), fItem(r)); if (!kind) return;
+        const ym = ymOf(r.日期), amt = n(r.金額); if (!ym || !amt) return;
+        out.push({ src:'exp', id:(r.ID !== undefined && r.ID !== '') ? String(r.ID) : '', raw:r.金額, ym, date:formatDate(r.日期), kind, item:String(fItem(r)), acc:String(r.帳戶 || ''), amt });
+    });
+    return out;
+}
 
 Chart.register(ChartDataLabels);
 Chart.defaults.set('plugins.datalabels', { display: false });
 
 let myChart=null, assetChart=null, incomeChart=null, compareChart=null, trendChart=null, moodChart=null, vsChart=null;
-let globalSnapshotData=[], globalTotalAssets=0, globalLivingFunds=0, globalExpensesData=[];
+let globalSnapshotData=[], globalTotalAssets=0, globalLivingFunds=0, globalExpensesData=[], globalIncomeRecs=[];
 let expShowCount=20; // 記帳列表目前顯示筆數（「載入更多」會增加）
 let editingExpenseId=null; // 記帳編輯模式：非 null 表示正在編輯該筆 ID
 function newId(){ return 'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); } // 唯一 ID
@@ -625,6 +723,22 @@ function formatDate(dateInput) {
         return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
     } catch(e) { return String(dateInput); }
 }
+
+// 月份鍵「yyyy/MM」：吃 yyyy/M/d、yyyy-MM-dd、2026年9月、202609；解析不了回傳 ''
+function ymOf(v) {
+    const s = String(v == null ? '' : v).trim();
+    let m = s.match(/^(\d{4})\D+(\d{1,2})/) || s.match(/^(\d{4})(\d{2})$/);
+    if (!m || +m[2] < 1 || +m[2] > 12) return '';
+    return m[1] + '/' + String(+m[2]).padStart(2, '0');
+}
+function ymNow() { const d = new Date(); return d.getFullYear() + '/' + String(d.getMonth() + 1).padStart(2, '0'); }
+function ymAdd(ym, k) {
+    let [y, m] = ym.split('/').map(Number); m += k;
+    while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; }
+    return y + '/' + String(m).padStart(2, '0');
+}
+// 金額顯示：money(-1200) → "-$1,200"；signed=true 時正數加「+」
+function money(v, signed) { v = Math.round(v); return (v < 0 ? '-' : (signed && v > 0 ? '+' : '')) + '$' + Math.abs(v).toLocaleString(); }
 
 // HTML 跳脫（避免項目名稱含 < > & " ' 破版或注入）
 function esc(s) {
@@ -1085,9 +1199,29 @@ function fillSelect(id, opts) {
         return `<option value="${esc(v)}">${esc(l)}</option>`;
     }).join('');
 }
+// 設定下拉值；選項裡沒有就補一個（編輯舊資料時帳戶/類別不在清單內，才不會被清成空白）
+function setSelectValue(id, v) {
+    const el = document.getElementById(id); if (!el) return;
+    v = String(v == null ? '' : v);
+    if (v && ![...el.options].some(o => o.value === v)) el.insertAdjacentHTML('beforeend', `<option value="${esc(v)}">${esc(accLabel(v))}</option>`);
+    el.value = v;
+}
+// 日常記帳：依「收支」切換類別與帳戶選項（收入 → 薪資/當沖…；支出 → 食衣住行… + 娛樂津貼）
+function syncExpForm() {
+    const isInc = document.getElementById('expType').value === '收入';
+    const cat = document.getElementById('expCategory'), acc = document.getElementById('expAccount');
+    const cv = cat.value, av = acc.value;
+    fillSelect('expCategory', isInc ? INCOME_KINDS.map(t => [t.cat, t.icon + ' ' + t.cat]) : expenseCatOptions());
+    const accs = isInc ? [...new Set([...OPTIONS.incAccount, ...OPTIONS.expAccount])] : OPTIONS.expAccount;
+    fillSelect('expAccount', accs.map(v => [v, accLabel(v)]));
+    if ([...cat.options].some(o => o.value === cv)) cat.value = cv;
+    if ([...acc.options].some(o => o.value === av)) acc.value = av;
+}
 function buildSelects() {
     fillSelect('expAccount',    OPTIONS.expAccount.map(v => [v, accLabel(v)]));
-    fillSelect('expCategory',   FIN.categories);
+    fillSelect('expCategory',   expenseCatOptions());
+    fillSelect('incType',       INCOME_KINDS.map(t => [t.cat, t.icon + ' ' + t.cat + (t.k === 'daytrade' ? '（賠錢填負數）' : '')]));
+    fillSelect('incAccount',    OPTIONS.incAccount.map(v => [v, accLabel(v)]));
     fillSelect('transFrom',     OPTIONS.transFrom.map(v => [v, accLabel(v)]));
     fillSelect('transTo',       OPTIONS.transTo.map(v => [v, accLabel(v)]));
     fillSelect('assetAccount',  OPTIONS.assetAccount.map(v => [v, accLabel(v)]));
@@ -1096,7 +1230,8 @@ function buildSelects() {
     const rf = document.getElementById('recordFilter');
     if (rf) {
         rf.innerHTML = '<option value="ALL">全部</option>'
-            + '<optgroup label="📂 類別">' + FIN.categories.map(c => `<option value="CAT_${esc(c)}">${esc(c)}</option>`).join('') + '</optgroup>'
+            + '<optgroup label="📂 類別">' + FIN.categories.concat([FUN_CAT]).map(c => `<option value="CAT_${esc(c)}">${esc(c)}</option>`).join('') + '</optgroup>'
+            + '<optgroup label="💵 收入">' + INCOME_KINDS.map(t => `<option value="CAT_${esc(t.cat)}">${esc(t.cat)}</option>`).join('') + '</optgroup>'
             + '<optgroup label="💳 帳戶">' + OPTIONS.filterAccounts.map(v => `<option value="ACC_${esc(v)}">${esc(accLabel(v))}</option>`).join('') + '</optgroup>';
     }
 }
@@ -1109,6 +1244,7 @@ async function loadSettings() {
         data.forEach(r => {
             const key = String(r.項目 || r.設定 || r.名稱 || r.key || "").trim();
             const valRaw = (r.數值 !== undefined) ? r.數值 : (r.值 !== undefined ? r.值 : r.value);
+            if (/娛樂/.test(key) && /起算|開始|起始/.test(key)) { const ym = ymOf(valRaw); if (ym) FUN_START = ym; return; } // 例：娛樂津貼起算｜2026/09
             const val = n(valRaw);
             if (!key || !val) return;
             if (/目標|桶金|goal/i.test(key))   SAVING_GOAL = val;
@@ -1156,6 +1292,8 @@ function setupDelegation() {
     if (restC) restC.addEventListener('click', e => { const dn = e.target.closest('.rest-done'); if (dn) { restMarkDone(dn.dataset.id); return; } const dl = e.target.closest('.rest-del'); if (dl) deleteRest(dl.dataset.id, dl); });
     const travelC = document.getElementById('travelContainer');
     if (travelC) travelC.addEventListener('click', e => { const dn = e.target.closest('.travel-done'); if (dn) { travelMarkDone(dn.dataset.id); return; } const dl = e.target.closest('.travel-del'); if (dl) deleteTravel(dl.dataset.id, dl); });
+    const incL = document.getElementById('incomeRecordList');
+    if (incL) incL.addEventListener('click', e => { const ed = e.target.closest('.inc-edit'); if (ed) { editIncome(ed.dataset.id); return; } const dl = e.target.closest('.inc-del'); if (dl) deleteIncome(dl); });
     setupMoodPicker();
 }
 
@@ -1178,7 +1316,7 @@ window.onload = async function() {
     setupDelegation();   // 列表按鈕事件委派（避免 inline onclick 注入）
 
     const today = new Date().toISOString().split('T')[0];
-    ['habitDate','assetDate','stDate','expDate','transDate','mediaDate','evtDate'].forEach(id => {
+    ['habitDate','assetDate','stDate','expDate','transDate','mediaDate','evtDate','incDate'].forEach(id => {
         let el = document.getElementById(id); if (el) el.value = today;
     });
 
@@ -1283,6 +1421,52 @@ function toggleAdvancedAsset() {
     f.style.display = f.style.display === 'none' ? 'block' : 'none';
 }
 
+// ===== 持股成本：富邦證券的紀錄依日期逐筆重算（加權平均法）=====
+// 1) 賣光（平倉）就把成本歸零，之後再買是新的一輪，不會跟以前買過的舊帳混在一起
+// 2) 同一天先買後賣（當沖）先沖掉當天買的那批，不會拉動原本庫存的均價
+// 3) 賣出扣的成本一律用當下均價重算，不看當初記的金額，舊紀錄扣錯也會自動校正
+// 沒填股數的紀錄（舊資料、手動調整）照金額加減成本
+function dayNum(v) { const m = String(v || '').replace(/-/g, '/').match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/); return m ? (+m[1]) * 10000 + (+m[2]) * 100 + (+m[3]) : 0; }
+function buildPositions(logData) {
+    const rows = [];
+    (Array.isArray(logData) ? logData : []).forEach((r, i) => {
+        if (String(r['帳戶'] || '') !== '富邦證券') return;
+        const name = String(fItem(r)).trim(); if (!name) return;
+        rows.push({ i, day: dayNum(r['日期']), name, q: n(r['數量']), a: n(r['金額']) });
+    });
+    rows.sort((x, y) => (x.day - y.day) || (x.i - y.i)); // 同一天維持原本記錄順序
+    const pos = {}; // 代號 -> { shares, cost, day, lots:[當天買進批次] }
+    rows.forEach(({ day, name, q, a }) => {
+        const p = pos[name] || (pos[name] = { shares: 0, cost: 0, day: 0, lots: [] });
+        if (p.day !== day) { p.day = day; p.lots = []; }
+        if (q > 0) { p.shares += q; p.cost += a; p.lots.push({ sh: q, cost: a }); }
+        else if (q < 0 && p.shares > 0) {
+            const sh = Math.min(-q, p.shares);
+            p.cost -= sellCostOf(p, sh, day, true);
+            p.shares -= sh;
+            if (p.shares < 1e-6) { p.shares = 0; p.cost = 0; p.lots = []; } // 平倉：歸零重新起算
+        }
+        else p.cost += a;
+    });
+    return pos;
+}
+// 賣出 sh 股應扣的成本：先沖當天（day）買進的批次，其餘用當天以前庫存的均價；commit=true 會把用掉的當天批次扣掉
+function sellCostOf(p, sh, day, commit) {
+    let rem = Math.min(sh, p.shares), cost = 0, lotSh = 0, lotCost = 0;
+    const lots = (p.day === day) ? p.lots : [];
+    lots.forEach(l => { lotSh += l.sh; lotCost += l.cost; });
+    for (const l of lots) {
+        if (rem <= 0) break;
+        const t = Math.min(rem, l.sh), c = l.cost * t / l.sh;
+        cost += c; rem -= t;
+        if (commit) { l.sh -= t; l.cost -= c; }
+    }
+    const baseSh = p.shares - lotSh, baseCost = p.cost - lotCost;
+    if (rem > 0 && baseSh > 0) cost += baseCost * Math.min(rem, baseSh) / baseSh;
+    if (commit) p.lots = lots.filter(l => l.sh > 1e-9);
+    return cost;
+}
+
 // 手續費自動計算（標準 0.1425%，最低 $20）
 function calcBrokerage(total) { return Math.max(20, Math.ceil(total * 0.001425)); }
 function calcTax(total)       { return Math.round(total * 0.003); } // 證交稅 0.3%（賣出才有）
@@ -1335,24 +1519,19 @@ async function updateStockPreview(recalcFee = true) {
         preview.innerHTML = `<div style="color:#aaa;font-size:0.9em;">⏳ 查詢持倉成本中...</div>`;
         const logData = await fetchTab('Asset_Log');
 
-        // 加權平均成本法
-        let remCost = 0, remShares = 0;
-        logData.forEach(row => {
-            if ((row['帳戶']||'').toString() === '富邦證券' &&
-                String(fItem(row)) === code) {
-                remCost   += n(row['金額']);
-                remShares += n(row['數量']);
-            }
-        });
+        // 加權平均成本法（與持股明細同一套：平倉歸零、當沖先沖當天買的）
+        const pos = buildPositions(logData)[code];
+        const remShares = pos ? pos.shares : 0;
 
         if (remShares <= 0) {
-            preview.innerHTML = `<div style="color:#e91e63;">⚠️ 找不到「${code}」的持倉記錄，請確認代號是否正確。</div>`;
+            preview.innerHTML = `<div style="color:#e91e63;">⚠️ 找不到「${esc(code)}」的持倉記錄，請確認代號是否正確。</div>`;
             preview._costBasis = null;
             return;
         }
 
-        const avgCost    = remCost / remShares;
-        const costBasis  = Math.round(avgCost * shares);
+        const sellSh     = Math.min(shares, remShares);
+        const costBasis  = Math.round(sellCostOf(pos, sellSh, dayNum(document.getElementById('stDate').value), false));
+        const avgCost    = costBasis / sellSh;
         const netProceeds = total - fee;
         const pnl        = netProceeds - costBasis;
         const pnlColor   = pnl >= 0 ? '#4caf50' : '#e91e63';
@@ -1366,9 +1545,9 @@ async function updateStockPreview(recalcFee = true) {
             <div>🏦 富邦銀行 入帳：<b style="color:#4caf50;">＋$${netProceeds.toLocaleString()}</b> <span style="color:#bbb;font-size:0.85em;">（扣手續費＋稅 $${fee.toLocaleString()}）</span></div>
             <div>📉 富邦證券 扣成本：<b style="color:#e91e63;">－$${costBasis.toLocaleString()}</b>（${shares} 股）</div>
             <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e0e0e0;display:flex;justify-content:space-between;align-items:center;">
-                <span style="color:#888;font-size:0.85em;">均攤成本 $${Math.round(avgCost).toLocaleString()}/股，剩餘 ${remShares} 股</span>
+                <span style="color:#888;font-size:0.85em;">均攤成本 $${avgCost.toFixed(2)}/股，目前持有 ${remShares.toLocaleString()} 股</span>
                 <b style="color:${pnlColor};">損益 ${pnlSign}$${Math.abs(pnl).toLocaleString()}</b>
-            </div>`;
+            </div>${shares > remShares ? `<div style="color:#e91e63;font-size:0.85em;margin-top:4px;">⚠️ 帳上只有 ${remShares.toLocaleString()} 股，成本只算得到這些</div>` : ''}`;
     }
 }
 
@@ -1416,7 +1595,7 @@ async function submitStockTrade() {
             ['stShares','stPrice','stCode','stFee'].forEach(id => document.getElementById(id).value = '');
             preview.style.display = 'none';
             invalidateCache('Asset_Log');
-            loadAssetChart(); loadAccountBalances();
+            loadAssetChart(); loadAccountBalances(); loadMonthlyIncome();
         } else {
             toast('寫入失敗：' + res, 'error');
         }
@@ -1448,6 +1627,8 @@ function renderHoldings(rows, investMV){
         let roiHtml;
         if(roi!==null){ const c=roi>=0?"#ff4d4f":"#52c41a", bg=roi>=0?"#fff1f0":"#f6ffed"; roiHtml=`<span style="font-size:0.8em;font-weight:bold;color:${c};background:${bg};padding:2px 8px;border-radius:8px;">${roi>=0?"▲":"▼"} ${roi>=0?"+":""}${roi.toFixed(1)}% · ${pnl>=0?"+":"-"}$${Math.abs(Math.round(pnl)).toLocaleString()}</span>`; }
         else roiHtml='<span style="font-size:0.8em;color:#bbb;background:#f7f7f7;padding:2px 8px;border-radius:8px;">報酬 —</span>';
+        const avg=(d.cost>0&&d.qty>0)?d.cost/d.qty:0;
+        const qtyWarn=(d.recShares>0&&Math.abs(d.recShares-d.qty)>1e-6)?` <span title="Asset_Log 交易紀錄加總的股數跟 Portfolio 持有數量不一樣，成本可能不準" style="color:#e65100;">⚠️ 交易紀錄 ${d.recShares.toLocaleString()} ${unit}</span>`:"";
         const pill=isETF?'<span style="font-size:0.72em;color:#1565c0;background:#e6f2ff;padding:1px 7px;border-radius:6px;margin-left:6px;">ETF</span>':'<span style="font-size:0.72em;color:#888;background:#f2f2f2;padding:1px 7px;border-radius:6px;margin-left:6px;">個股</span>';
         return `<div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:12px 14px;">
             <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
@@ -1455,7 +1636,7 @@ function renderHoldings(rows, investMV){
                 <span style="font-size:1.15em;font-weight:bold;color:#333;white-space:nowrap;">$${Math.round(d.mv).toLocaleString()}</span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap;">
-                <span style="font-size:0.85em;color:#999;">${d.qty.toLocaleString()} ${unit}</span>
+                <span style="font-size:0.85em;color:#999;">${d.qty.toLocaleString()} ${unit}${avg?` · 均價 $${avg.toFixed(2)}`:""}${qtyWarn}</span>
                 <span style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">${dayHtml}${roiHtml}</span>
             </div>
             <div style="display:flex;align-items:center;gap:8px;margin-top:9px;">
@@ -1464,7 +1645,11 @@ function renderHoldings(rows, investMV){
             </div>
         </div>`;
     }).join("");
-    if(totalEl) totalEl.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:10px 14px;background:#fafafa;border-radius:8px;"><span style="font-size:0.9em;color:#888;">投資合計</span><span style="font-size:1.05em;font-weight:bold;color:#333;">$${Math.round(investMV).toLocaleString()}</span></div>`;
+    // 合計：只算有成本的部位，才能跟券商 App 的「未實現損益」對得起來
+    let cMv=0, cCost=0; rows.forEach(d=>{ if(d.cost>0){ cMv+=d.mv; cCost+=d.cost; } });
+    const uPnl=cMv-cCost, uPct=cCost>0?uPnl/cCost*100:0, uCol=uPnl>=0?"#ff4d4f":"#52c41a";
+    const pnlLine=cCost>0?`<div style="display:flex;flex-wrap:wrap;gap:2px 10px;align-items:center;margin-top:6px;font-size:0.85em;color:#888;"><span style="white-space:nowrap;">持股成本 $${Math.round(cCost).toLocaleString()}</span><span style="white-space:nowrap;margin-left:auto;font-weight:bold;color:${uCol};">未實現 ${uPnl>=0?"+":"-"}$${Math.abs(Math.round(uPnl)).toLocaleString()} (${uPnl>=0?"+":""}${uPct.toFixed(2)}%)</span></div>`:"";
+    if(totalEl) totalEl.innerHTML=`<div style="margin-top:12px;padding:10px 14px;background:#fafafa;border-radius:8px;"><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:0.9em;color:#888;">投資合計</span><span style="font-size:1.05em;font-weight:bold;color:#333;">$${Math.round(investMV).toLocaleString()}</span></div>${pnlLine}</div>`;
 }
 
 // 功能 4：資產圖
@@ -1478,25 +1663,18 @@ function loadAssetChart() {
         // 記帳邏輯：
         // 買股：富邦銀行 買XXXX(-), 富邦證券 XXXX(+成本)
         // 賣股：富邦銀行 賣XXXX(+實收), 富邦證券 XXXX(-成本，非賣出金額)
-        // 當沖：富邦銀行 買賣XXXX(淨損益，不進富邦證券)
-        let totalAssets=0, investMV=0, totalBuyCost=0, itemCostMap={}, positionProceeds=0, tradeNetPnL=0, divs=0, todayPnL=0;
+        // 當沖：記成收入「當沖收入」(淨損益，可負)，不進富邦證券；舊的「買賣XXXX」也照算
+        // 各檔成本改由 buildPositions 逐筆重算（平倉歸零、當沖不混進庫存）
+        let totalAssets=0, investMV=0, totalBuyCost=0, positionProceeds=0, todayPnL=0;
+        const positions=buildPositions(logData);
         logData.forEach(row => {
             let acc=(row['帳戶']||"").toString(), amt=n(row['金額']), name=String(fItem(row));
-            if (acc==="富邦證券") {
-                if (amt > 0) {
-                    totalBuyCost += amt;
-                    itemCostMap[name] = (itemCostMap[name]||0) + amt;
-                } else {
-                    itemCostMap[name] = (itemCostMap[name]||0) + amt; // 扣掉已賣出成本
-                }
-            } else if (acc==="富邦銀行") {
-                if (name.match(/^賣/) && !name.startsWith("買賣")) positionProceeds += amt > 0 ? amt : 0;
-                else if (name.startsWith("買賣")) tradeNetPnL += amt;
-                if (name.includes("股利")||name.includes("股息")) divs += Math.max(0, amt);
-            } else {
-                if (name.includes("股利")||name.includes("股息")) divs += Math.max(0, amt);
-            }
+            if (acc==="富邦證券") { if (amt > 0) totalBuyCost += amt; }
+            else if (acc==="富邦銀行" && name.match(/^賣/)) positionProceeds += amt > 0 ? amt : 0;
         });
+        const incomeRecs=collectIncome(logData, expData);
+        const sumKind=(...ks)=>incomeRecs.filter(r=>ks.includes(r.kind)).reduce((s,r)=>s+r.amt,0);
+        const tradeNetPnL=sumKind('daytrade','rebate'), divs=sumKind('dividend'); // 當沖淨損益＋退手續費、股利
 
         const palette=['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40','#C9CBCF','#E7E9ED','#76D7C4','#F1948A'];
         let labels=[], values=[], colors=[], holdRows=[], beta=null;
@@ -1516,11 +1694,12 @@ function loadAssetChart() {
             totalAssets+=mv;
             if(!isCash) investMV+=mv;
             if(mv>0){labels.push(name);values.push(mv);colors.push(palette[i%palette.length]);}
-            let cost=isCash?mv:(itemCostMap[name]||0);
+            let pos=isCash?null:positions[name.trim()];
+            let cost=isCash?mv:Math.round(pos?pos.cost:0);
             globalSnapshotData.push({item:name,qty,mv,cost});
             let dc=(pNow-pYest)*qty, showDc=dc!==0&&Math.abs(pNow-1)>0.01&&!isCash;
             if(!isCash&&qty>0&&pYest>1&&pNow>0) todayPnL+=dc; // 今日損益：排除現金與沒有有效昨收(=1 佔位)的列
-            if(!isCash) holdRows.push({name, qty, mv, cost, dc, showDc, color:palette[i%palette.length]}); // 持股明細只列投資部位(不含現金)
+            if(!isCash) holdRows.push({name, qty, mv, cost, dc, showDc, recShares:pos?pos.shares:0, color:palette[i%palette.length]}); // 持股明細只列投資部位(不含現金)
         });
 
         renderHoldings(holdRows, investMV);
@@ -1570,7 +1749,7 @@ function submitExpense() {
             toast(editing ? "✏️ 已更新！" : "💸 記帳成功！", 'success');
             cancelEditExpense();
             document.getElementById('expItem').value="";document.getElementById('expAmount').value="";
-            invalidateCache('Expenses_DB');loadExpenses();loadExpenseComparison();loadAccountBalances();loadTrendChart();
+            invalidateCache('Expenses_DB');refreshMoneyViews();
         } else {toast("失敗："+data, 'error'); reset();}
     }).catch(() => { toast("連線錯誤，請重試", 'error'); reset(); });
 }
@@ -1583,8 +1762,9 @@ function editExpense(id){
     if(!row){ toast("找不到該筆紀錄",'error'); return; }
     document.getElementById('expDate').value=String(row.日期||"").replace(/\//g,"-").split("T")[0];
     document.getElementById('expType').value=row.收支||"支出";
-    document.getElementById('expAccount').value=row.帳戶||"";
-    document.getElementById('expCategory').value=String(fCategory(row))||"";
+    syncExpForm(); // 先依收支換好類別/帳戶選項，再帶入值
+    setSelectValue('expAccount', row.帳戶||"");
+    setSelectValue('expCategory', String(fCategory(row))||"");
     document.getElementById('expItem').value=String(fItem(row));
     document.getElementById('expAmount').value=n(row.金額);
     editingExpenseId=id;
@@ -1596,16 +1776,17 @@ function editExpense(id){
 // 快速帶入
 function quickFill(item,category,amount,account){
     cancelEditExpense(); // 點快速帶入即離開編輯模式
-    document.getElementById('expItem').value=item;
-    document.getElementById('expCategory').value=category;
-    document.getElementById('expAmount').value=amount;
-    document.getElementById('expAccount').value=account;
     document.getElementById('expType').value="支出";
+    syncExpForm();
+    document.getElementById('expItem').value=item;
+    setSelectValue('expCategory', category);
+    document.getElementById('expAmount').value=amount;
+    setSelectValue('expAccount', account);
     document.getElementById('expAmount').focus();
 }
 
 // 動態常用項目：依歷史記帳頻率排序，並帶入每個項目「最近一次」的類別/帳戶/金額
-const CAT_EMOJI = {食:'🍱',衣:'👕',住:'🏠',行:'🚆',育樂:'🎮',其他:'🛒'};
+const CAT_EMOJI = {食:'🍱',衣:'👕',住:'🏠',行:'🚆',育樂:'🎮',其他:'🛒',[FUN_CAT]:'🎟️'};
 function renderQuickButtons(){
     const box=document.getElementById('quickFillBox');
     if(!box) return;
@@ -1651,12 +1832,12 @@ function renderExpenseList() {
     if(!display.length){list.innerHTML="<li style='color:#ccc;text-align:center;padding:10px;'>無符合紀錄</li>";return;}
     let html="";
     display.forEach(row=>{
-        const isIncome=row.收支==="收入";
-        const color=isIncome?"#4caf50":"#e91e63", sign=isIncome?"+":"-";
+        const amt=n(row.金額), effect=row.收支==="收入"?amt:-amt; // 對帳戶的影響：當沖虧損是「收入」但金額為負
+        const color=effect>=0?"#4caf50":"#e91e63", sign=effect>=0?"+":"-";
         const d=formatDate(row.日期), item=String(fItem(row)), cat=esc(fCategory(row)), acc=esc(row.帳戶||"");
         const id=(row.ID!==undefined&&row.ID!=='')?String(row.ID):"";
         const editBtn=id?`<button class="edit-exp" data-id="${esc(id)}" style="background:#fff3e0;color:#e65100;padding:5px 9px;font-size:0.8rem;border-radius:5px;box-shadow:none;border:1px solid #ffe0b2;margin-right:5px;">✏️</button>`:"";
-        html+=`<li style="padding:10px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;"><div style="flex:1;"><span style="font-weight:bold;color:#555;">${esc(item)}</span><span style="font-size:0.85em;color:#999;margin-left:5px;">(${d})</span><br><span style="font-size:0.85em;background:#f0f0f0;padding:2px 6px;border-radius:4px;">${cat}</span> <span style="font-size:0.85em;background:#f0f0f0;padding:2px 6px;border-radius:4px;">${acc}</span></div><div style="font-weight:bold;color:${color};margin-right:10px;">${sign}$${n(row.金額).toLocaleString()}</div>${editBtn}<button class="del-exp" data-id="${esc(id)}" data-d="${esc(d)}" data-i="${esc(item)}" data-a="${esc(row.金額)}" style="background:#ffebee;color:#c62828;padding:5px 10px;font-size:0.8rem;border-radius:5px;box-shadow:none;border:1px solid #ffcdd2;">🗑️</button></li>`;
+        html+=`<li style="padding:10px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;"><div style="flex:1;"><span style="font-weight:bold;color:#555;">${esc(item)}</span><span style="font-size:0.85em;color:#999;margin-left:5px;">(${d})</span><br><span style="font-size:0.85em;background:#f0f0f0;padding:2px 6px;border-radius:4px;">${cat}</span> <span style="font-size:0.85em;background:#f0f0f0;padding:2px 6px;border-radius:4px;">${acc}</span></div><div style="font-weight:bold;color:${color};margin-right:10px;">${sign}$${Math.abs(amt).toLocaleString()}</div>${editBtn}<button class="del-exp" data-id="${esc(id)}" data-d="${esc(d)}" data-i="${esc(item)}" data-a="${esc(row.金額)}" style="background:#ffebee;color:#c62828;padding:5px 10px;font-size:0.8rem;border-radius:5px;box-shadow:none;border:1px solid #ffcdd2;">🗑️</button></li>`;
     });
     if(ordered.length>display.length){
         html+=`<li style="text-align:center;padding:10px;"><button class="more-exp" style="background:#eceff1;color:#555;box-shadow:none;padding:6px 18px;font-size:0.85rem;">載入更多（還有 ${ordered.length-display.length} 筆）</button></li>`;
@@ -1668,33 +1849,21 @@ function renderExpenseList() {
 function loadExpenseComparison() {
     Promise.all([fetchTab('Expenses_DB'), fetchTab('Asset_Log')]).then(([data, logData])=>{
         if(!data.length) return;
-        const now=new Date(), cmKey=`${now.getFullYear()}/${now.getMonth()+1}`;
-        let lmY=now.getFullYear(), lmM=now.getMonth();
-        if(lmM===0){lmY--;lmM=12;} const lmKey=`${lmY}/${lmM}`;
+        const cmKey=ymNow(), lmKey=ymAdd(cmKey,-1);
         const cats=FIN.categories;
-        let tm={total:0},lm={total:0}; cats.forEach(c=>{tm[c]=0;lm[c]=0;});
+        let tm={total:0},lm={total:0},funThisMonth=0; cats.forEach(c=>{tm[c]=0;lm[c]=0;});
 
         data.forEach(row=>{
             if(row.收支!=="支出") return;
-            let rKey="", d=new Date(row.日期);
-            if(!isNaN(d.getTime())) rKey=`${d.getFullYear()}/${d.getMonth()+1}`;
-            else if(typeof row.日期==='string'&&row.日期.includes("/")){let p=row.日期.split("/");rKey=`${p[0]}/${parseInt(p[1])}`;}
-            let c=cats.includes(row.類別)?row.類別:"其他", amt=n(row.金額);
+            let rKey=ymOf(row.日期), cat=String(fCategory(row)).trim(), amt=n(row.金額);
+            if(cat===FUN_CAT){ if(rKey===cmKey) funThisMonth+=amt; return; } // 娛樂津貼支出另計，不佔當月預算
+            let c=cats.includes(cat)?cat:"其他";
             if(rKey===cmKey){tm[c]+=amt;tm.total+=amt;}
             else if(rKey===lmKey){lm[c]+=amt;lm.total+=amt;}
         });
 
-        // 本月收入（用於儲蓄率），排除股票賣出收款（資本返還，非真實收入）
-        let monthIncome=0;
-        logData.forEach(row=>{
-            let amt=n(row.金額); if(amt<=0) return;
-            let acc=row.帳戶||"", name=String(fItem(row));
-            if(!acc.includes("郵局")&&!acc.includes("銀行")&&!acc.includes("現金")) return;
-            if(name.match(/^賣/)) return;  // 排除「賣2454」等股票賣出收款
-            if(name.match(/賣出|存錢|轉入|領錢|換匯/)) return;
-            let d=new Date(row.日期); if(isNaN(d.getTime())) return;
-            if(`${d.getFullYear()}/${d.getMonth()+1}`===cmKey) monthIncome+=amt;
-        });
+        // 本月收入（用於儲蓄率）：跟「每月收入」同一套分類，含當沖盈虧（可能為負）；股票賣出收款屬資本返還，不算
+        const monthIncome=collectIncome(logData,data).filter(r=>r.ym===cmKey).reduce((s,r)=>s+r.amt,0);
 
         document.getElementById('monthExpenseDisplay').innerText="$"+tm.total.toLocaleString();
         const remain=MONTHLY_BUDGET-tm.total, pct=Math.round((tm.total/MONTHLY_BUDGET)*100);
@@ -1702,14 +1871,14 @@ function loadExpenseComparison() {
         document.getElementById('budgetPercent').innerText=pct+"%";
         document.getElementById('budgetBar').style.width=Math.min(pct,100)+"%";
         const msgEl=document.getElementById('budgetMessage');
-        if(remain>=0){msgEl.innerText=`✅ 還剩 $${remain.toLocaleString()} 可花`;document.getElementById('budgetBar').style.backgroundColor="#fff";}
+        if(remain>=0){msgEl.innerText=`✅ 還剩 $${remain.toLocaleString()}（月底存進娛樂津貼）`;document.getElementById('budgetBar').style.backgroundColor="#fff";}
         else{msgEl.innerText=`⚠️ 已超支 $${Math.abs(remain).toLocaleString()}!`;document.getElementById('budgetBar').style.backgroundColor="#ffeb3b";}
 
         // 儲蓄率
         const srEl=document.getElementById('savingsRateDisplay');
         if(srEl){
             if(monthIncome>0){
-                let sr=((monthIncome-tm.total)/monthIncome*100).toFixed(1);
+                let sr=((monthIncome-tm.total-funThisMonth)/monthIncome*100).toFixed(1); // 儲蓄率看實際花掉的錢，娛樂津貼支出也要算
                 srEl.innerText=sr+"%"; srEl.style.color=sr>=30?"#4ade80":sr>=0?"#fde68a":"#f87171";
             } else srEl.innerText="無收入資料";
         }
@@ -1727,31 +1896,167 @@ function loadExpenseComparison() {
             let ds=d>0?`<span style="color:red">▲ ${d}</span>`:d<0?`<span style="color:green">▼ ${Math.abs(d)}</span>`:"–";
             body.innerHTML+=`<tr><td style="padding:8px;font-weight:bold;">${c}</td><td style="padding:8px;">$${v1}</td><td style="padding:8px;color:#888;">$${v2}</td><td style="padding:8px;">${ds}</td></tr>`;
         });
+        renderFunAllowance(data);
     });
 }
 
-// 功能 8：每月收入圖
+// 娛樂津貼：每個月結束時「預算 − 當月花費」> 0 就存入（超支不扣）；類別「娛樂津貼」的支出從餘額扣
+function computeFunAllowance(expData){
+    const spent={}, used={};
+    (expData||[]).forEach(r=>{
+        if(r.收支!=="支出") return;
+        const ym=ymOf(r.日期); if(!ym) return;
+        const amt=n(r.金額);
+        if(String(fCategory(r)).trim()===FUN_CAT) used[ym]=(used[ym]||0)+amt;
+        else spent[ym]=(spent[ym]||0)+amt;
+    });
+    const cur=ymNow(), months=Object.keys(spent).concat(Object.keys(used)).sort();
+    let start=FUN_START||months[0]||cur; if(start>cur) start=cur;
+    const rows=[]; let bal=0;
+    for(let ym=start, guard=0; ym<=cur&&guard<600; ym=ymAdd(ym,1), guard++){
+        const s=spent[ym]||0, u=used[ym]||0, closed=ym<cur, left=Math.max(0,MONTHLY_BUDGET-s);
+        const dep=closed?left:0; // 本月還沒結束，先不存入
+        bal+=dep-u;
+        rows.push({ym, spent:s, used:u, dep, proj:closed?0:left, closed, bal});
+    }
+    return {rows, bal};
+}
+function renderFunAllowance(expData){
+    const {rows, bal}=computeFunAllowance(expData);
+    const balEl=document.getElementById('funBalance'), mini=document.getElementById('funBalanceMini');
+    if(balEl){ balEl.innerText=money(bal); balEl.style.color=bal<0?"#e53935":"#8e24aa"; }
+    if(mini) mini.innerText=money(bal);
+    const cur=rows[rows.length-1], hint=document.getElementById('funHint');
+    if(hint&&cur){
+        hint.innerHTML=`每月預算 $${MONTHLY_BUDGET.toLocaleString()}・本月目前花了 ${money(cur.spent)}，`
+            +(cur.proj>0?`月底預計存入 <b style="color:#8e24aa;">+${money(cur.proj)}</b>`:`已用完預算，本月不會存入`)
+            +(cur.used?`・本月已動用 ${money(cur.used)}`:'')
+            +(bal<0?`<br><span style="color:#e53935;">⚠️ 娛樂津貼已透支 ${money(-bal)}</span>`:'');
+    }
+    const body=document.getElementById('funTableBody'); if(!body) return;
+    if(!rows.length){ body.innerHTML='<tr><td colspan="5" style="color:#888;padding:8px;">尚無記帳資料</td></tr>'; return; }
+    const td='padding:7px 3px;text-align:right;white-space:nowrap;', sub=t=>`<br><span style="font-size:0.8em;font-weight:normal;">${t}</span>`;
+    body.innerHTML=rows.slice().reverse().map(r=>{
+        const over=r.spent>MONTHLY_BUDGET;
+        const depCell=r.closed?(r.dep>0?`<span style="color:#2e7d32;">+${money(r.dep)}</span>`:'<span style="color:#aaa;">—</span>')
+            :`<span style="color:#aaa;">+${money(r.proj)}${sub('預計')}</span>`;
+        return `<tr style="border-bottom:1px solid #eee;">`
+            +`<td style="padding:7px 3px;white-space:nowrap;font-weight:bold;">${r.ym}${r.closed?'':`<span style="color:#8e24aa;">${sub('進行中')}</span>`}</td>`
+            +`<td style="${td}${over?'color:#e53935;':''}">${money(r.spent)}${over?sub('超支'):''}</td>`
+            +`<td style="${td}">${depCell}</td>`
+            +`<td style="${td}">${r.used?`<span style="color:#e91e63;">-${money(r.used)}</span>`:'<span style="color:#aaa;">—</span>'}</td>`
+            +`<td style="${td}font-weight:bold;${r.bal<0?'color:#e53935;':''}">${money(r.bal)}</td></tr>`;
+    }).join('');
+}
+
+// 功能 8：每月收入（薪資 / 當沖 / 當沖退手續費 / 股利 / 利息 / 其他）
+// 資料來源見 collectIncome；當沖可能為負，堆疊長條會往 0 以下長，折線是當月合計
+let incomeYm=null; // 右側明細目前看的月份
+function refreshMoneyViews(){ loadExpenses(); loadExpenseComparison(); loadAccountBalances(); loadMonthlyIncome(); loadAssetChart(); }
 function loadMonthlyIncome() {
-    fetchTab('Asset_Log').then(data=>{
-        if(!data.length) return;
-        let md={};
-        data.forEach(row=>{
-            let amt=n(row.金額); if(amt<=0) return;
-            let acc=row.帳戶||"",cat=String(fCategory(row));
-            if(!acc.includes("郵局")&&!acc.includes("銀行")&&!acc.includes("現金")&&cat!=="現金") return;
-            let d=new Date(row.日期); if(isNaN(d.getTime())) return;
-            let mk=`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}`;
-            if(!md[mk]) md[mk]={salary:0,invest:0};
-            let item=String(fItem(row));
-            if(item.match(/賣出|存錢|轉入|領錢|換匯/)) return;
-            if(item.match(/股利|利息|股息/)) md[mk].invest+=amt;
-            else if(item.match(/薪|工讀|獎金|監考|普發|家教|助教|打工/)) md[mk].salary+=amt;
-        });
-        let months=Object.keys(md).sort();
+    Promise.all([fetchTab('Asset_Log'), fetchTab('Expenses_DB')]).then(([logData, expData])=>{
+        const recs=collectIncome(logData, expData);
+        globalIncomeRecs=recs;
+        const byM={};
+        recs.forEach(r=>{ const m=byM[r.ym]||(byM[r.ym]={}); m[r.kind]=(m[r.kind]||0)+r.amt; });
+        const cur=ymNow(), keys=Object.keys(byM).sort();
+        let last=cur; if(keys.length&&keys[keys.length-1]>last) last=keys[keys.length-1];
+        let first=ymAdd(last,-11); if(keys.length&&keys[0]>first) first=keys[0];
+        const months=[]; for(let ym=first, g=0; ym<=last&&g<24; ym=ymAdd(ym,1), g++) months.push(ym);
+
+        const dark=document.body.classList.contains('dark'), surface=dark?'#1e1e1e':'#ffffff';
+        const val=(m,k)=>Math.round((byM[m]||{})[k]||0);
+        const datasets=INCOME_KINDS.filter(t=>months.some(m=>val(m,t.k)!==0)).map(t=>({
+            type:'bar', label:t.label, data:months.map(m=>val(m,t.k)),
+            backgroundColor:dark?t.dark:t.color, borderColor:surface, borderWidth:2, borderSkipped:'start', borderRadius:4, stack:'inc'
+        }));
+        const lineCol=dark?'#c3c2b7':'#52514e';
+        datasets.push({ type:'line', label:'合計', data:months.map(m=>INCOME_KINDS.reduce((s,t)=>s+val(m,t.k),0)),
+            borderColor:lineCol, backgroundColor:lineCol, borderWidth:2, pointRadius:4, pointHoverRadius:6, tension:0.2, stack:'total', order:-1 });
+
         const ctx=document.getElementById('incomeSourceChart');
         if(incomeChart) incomeChart.destroy();
-        incomeChart=new Chart(ctx,{type:'bar',data:{labels:months,datasets:[{label:'薪資/主動收入',data:months.map(m=>md[m].salary),backgroundColor:'#36A2EB',stack:'s'},{label:'投資/被動收入',data:months.map(m=>md[m].invest),backgroundColor:'#FFCE56',stack:'s'}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{tooltip:{callbacks:{label(c){return c.dataset.label+': '+new Intl.NumberFormat('en-US',{style:'currency',currency:'TWD',maximumFractionDigits:0}).format(c.parsed.y);}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
-    });
+        incomeChart=new Chart(ctx,{type:'bar',data:{labels:months.map(m=>m.slice(2)),datasets},options:{responsive:true,maintainAspectRatio:false,
+            interaction:{mode:'index',intersect:false},
+            onClick:(e,els)=>{ if(els.length){ incomeYm=months[els[0].index]; renderIncomeMonth(); } },
+            plugins:{legend:{position:'bottom',labels:{boxWidth:12}},tooltip:{
+                filter:it=>it.dataset.type==='line'||it.parsed.y!==0,
+                callbacks:{title:items=>items.length?months[items[0].dataIndex]:'', label:c=>c.dataset.label+'：'+money(c.parsed.y, c.dataset.type!=='line')}}},
+            scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,ticks:{callback:v=>money(v)}}}}});
+
+        if(!incomeYm) incomeYm=cur;
+        renderIncomeMonth();
+    }).catch(()=>{});
+}
+function incomeShift(d){ const nx=ymAdd(incomeYm||ymNow(), d); if(nx>ymNow()) return; incomeYm=nx; renderIncomeMonth(); }
+function renderIncomeMonth(){
+    const ym=incomeYm||ymNow(), recs=(globalIncomeRecs||[]).filter(r=>r.ym===ym);
+    const lbl=document.getElementById('incomeMonthLabel'); if(lbl) lbl.innerText=ym+(ym===ymNow()?'（本月）':'');
+    const total=recs.reduce((s,r)=>s+r.amt,0), tEl=document.getElementById('incomeMonthTotal');
+    if(tEl){ tEl.innerText=money(total); tEl.style.color=total<0?'#e53935':''; }
+    const dark=document.body.classList.contains('dark'), sums={};
+    recs.forEach(r=>{ sums[r.kind]=(sums[r.kind]||0)+r.amt; });
+    const bd=document.getElementById('incomeBreakdown');
+    if(bd) bd.innerHTML=INCOME_KINDS.filter(t=>sums[t.k]).map(t=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:0.85em;background:#f8f9fa;border:1px solid #eee;border-radius:12px;padding:3px 10px;color:#555;"><span style="width:9px;height:9px;border-radius:50%;background:${dark?t.dark:t.color};"></span>${t.label} <b style="color:#333;">${money(sums[t.k], t.k==='daytrade')}</b></span>`).join('');
+    const list=document.getElementById('incomeRecordList'); if(!list) return;
+    if(!recs.length){ list.innerHTML='<li style="color:#aaa;text-align:center;padding:12px;">這個月還沒有收入紀錄</li>'; return; }
+    list.innerHTML=recs.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(r=>{
+        const t=INCOME_KIND[r.kind], col=r.amt>=0?'#4caf50':'#e91e63';
+        const btns=(r.src==='exp'&&r.id)
+            ? `<button class="inc-edit" data-id="${esc(r.id)}" style="background:#fff3e0;color:#e65100;padding:4px 8px;font-size:0.8rem;border-radius:5px;box-shadow:none;border:1px solid #ffe0b2;margin-left:6px;">✏️</button><button class="inc-del" data-id="${esc(r.id)}" data-d="${esc(r.date)}" data-i="${esc(r.item)}" data-a="${esc(r.raw)}" style="background:#ffebee;color:#c62828;padding:4px 8px;font-size:0.8rem;border-radius:5px;box-shadow:none;border:1px solid #ffcdd2;margin-left:5px;">🗑️</button>`
+            : `<span title="記在資產流水帳（Asset_Log），要改請到試算表" style="font-size:0.75em;color:#aaa;margin-left:6px;white-space:nowrap;">資產帳</span>`;
+        return `<li style="display:flex;align-items:center;padding:8px 4px;border-bottom:1px solid #eee;"><div style="flex:1;min-width:0;"><span style="color:#333;">${t.icon} ${esc(r.item)}</span><br><span style="font-size:0.8em;color:#999;">${esc(r.date.slice(5))} · ${esc(accLabel(r.acc))}</span></div><b style="color:${col};white-space:nowrap;">${money(r.amt, true)}</b>${btns}</li>`;
+    }).join('');
+}
+function toggleIncomeForm(){
+    const f=document.getElementById('incomeForm'), show=f.style.display==='none';
+    f.style.display=show?'flex':'none';
+    if(show) onIncomeTypeChange();
+}
+function onIncomeTypeChange(){
+    const type=document.getElementById('incType').value, acc=document.getElementById('incAccount');
+    let saved=null; try{ saved=localStorage.getItem('INC_ACC_'+type); }catch(e){}
+    const def=saved||(/當沖|股利/.test(type)?'富邦銀行':OPTIONS.incAccount[0]); // 記住每種收入上次用的帳戶
+    if([...acc.options].some(o=>o.value===def)) acc.value=def;
+    const amt=document.getElementById('incAmount'), hint=document.getElementById('incHint');
+    const isDay=type==='當沖收入';
+    amt.placeholder=isDay?'賺填正數，賠填負數（如 -1200）':'金額';
+    hint.innerHTML=isDay?'⚡ 填當天（或這段期間）的當沖<b>淨損益</b>，券商 App 顯示的當沖損益通常已扣手續費與交易稅，照填即可；賠錢記得加負號。'
+        :type==='當沖退手續費'?'↩️ 券商退回的當沖手續費（通常每月一次），填正數。'
+        :type==='薪資'?'💼 實際入帳的薪水（扣完勞健保後的金額）。':'';
+}
+function submitIncome(btn){
+    const type=document.getElementById('incType').value, date=document.getElementById('incDate').value, account=document.getElementById('incAccount').value;
+    const note=document.getElementById('incNote').value.trim(), raw=n(document.getElementById('incAmount').value);
+    if(!date){ toast('請選擇日期','error'); return; }
+    if(!raw){ toast('請輸入金額','error'); return; }
+    const amount=type==='當沖收入'?raw:Math.abs(raw); // 只有當沖可以是負的
+    const item=note?`${type} ${note}`:type;
+    btn.disabled=true; btn.innerText='寫入中...';
+    const reset=()=>{ btn.disabled=false; btn.innerText='記一筆收入'; };
+    apiPost({tab:'Expenses_DB',date,type:'收入',account,category:type,item,amount,id:newId()}).then(d=>{
+        if(d.includes('Success')){
+            toast(`💵 已記 ${type} ${money(amount, type==='當沖收入')}`,'success');
+            try{ localStorage.setItem('INC_ACC_'+type, account); }catch(e){}
+            document.getElementById('incAmount').value=''; document.getElementById('incNote').value='';
+            incomeYm=ymOf(date)||incomeYm;
+            invalidateCache('Expenses_DB'); refreshMoneyViews();
+        } else toast('失敗：'+d,'error');
+        reset();
+    }).catch(()=>{ toast('連線錯誤，請重試','error'); reset(); });
+}
+function editIncome(id){
+    switchTab('expenses', document.querySelectorAll('.nav-item')[1]);
+    editExpense(id);
+}
+async function deleteIncome(btn){
+    const {id, d, i, a}=btn.dataset;
+    if(!await confirmDialog(`確定刪除「${i} ${money(n(a), true)}」嗎？`)) return;
+    btn.innerText='⏳'; btn.disabled=true;
+    apiPost({action:'delete',tab:'Expenses_DB',id,date:d,item:i,amount:a}).then(res=>{
+        if(res.includes('Deleted')){ if(String(id)===String(editingExpenseId)) cancelEditExpense(); invalidateCache('Expenses_DB'); refreshMoneyViews(); toast('🗑️ 已刪除！','success'); }
+        else { toast('刪除失敗：'+res,'error'); btn.innerText='🗑️'; btn.disabled=false; }
+    }).catch(()=>{ toast('連線錯誤，請重試','error'); btn.innerText='🗑️'; btn.disabled=false; });
 }
 
 // 功能 9：帳戶餘額
@@ -1948,7 +2253,7 @@ function submitWish(btn){
 }
 async function fillExpense(date,item,price,btnEl,id){
     if(!await confirmDialog(`🎉 「${item}」將帶入記帳並從清單移除，確定嗎？`)) return;
-    document.getElementById('expItem').value=item;document.getElementById('expAmount').value=price;document.getElementById('expType').value="支出";
+    document.getElementById('expType').value="支出";syncExpForm();document.getElementById('expItem').value=item;document.getElementById('expAmount').value=price;
     // 切換分頁，並正確設定導覽列 active
     document.querySelectorAll('.view-section').forEach(el=>el.classList.remove('active'));
     document.getElementById('view-expenses').classList.add('active');
@@ -1978,7 +2283,7 @@ async function deleteExpense(date,item,amount,btn,id){
         if(data.includes("Deleted")){
             if(id&&String(id)===String(editingExpenseId)) cancelEditExpense();
             let li=btn.closest('li');li.style.opacity="0";
-            setTimeout(()=>{li.remove();invalidateCache('Expenses_DB');loadExpenses();loadExpenseComparison();loadAccountBalances();toast("🗑️ 已刪除！",'success');},500);
+            setTimeout(()=>{li.remove();invalidateCache('Expenses_DB');refreshMoneyViews();toast("🗑️ 已刪除！",'success');},500);
         } else if(data.includes("NotFound")){toast("❌ 找不到此紀錄（舊資料僅能刪最近 30 筆）",'error');btn.innerText="🗑️";btn.disabled=false;}
         else{toast("失敗："+data,'error');btn.innerText="🗑️";btn.disabled=false;}
     }).catch(()=>{toast("連線錯誤，請重試",'error');btn.innerText="🗑️";btn.disabled=false;});
