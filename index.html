@@ -318,7 +318,7 @@
                     <tbody id="funTableBody"><tr><td colspan="5" style="color:#888;padding:8px;">計算中...</td></tr></tbody>
                 </table>
             </div>
-            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">規則：每個月結束時，「預算 − 當月花費」有剩就存進來（超支不扣）。要花這筆錢時，記帳類別選「🎟️ 娛樂津貼」，會從這裡扣、不算進當月預算。想改起算月份，在 Settings 分頁加一列「娛樂津貼起算｜2026/09」。</div>
+            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">規則：每月「預算 − 當月花費」有剩就存進來；超支的話，超出的部分先從娛樂津貼扣。要花這筆錢時，記帳類別選「🎟️ 娛樂津貼」，會從這裡扣、不算進當月預算。目前從 2026/10 起算，想改起算月份，在 Settings 分頁加一列「娛樂津貼起算｜2026/10」。</div>
         </div>
 
         <div class="card">
@@ -631,7 +631,7 @@ const OPTIONS = {
 const FUN_CAT = '娛樂津貼';
 const LEND_CAT = '代墊';          // 支出：幫別人墊錢，不算自己支出(帳戶照扣)
 const LEND_BACK_CAT = '代墊收回';  // 收入：對方還錢，不算自己收入(帳戶照加)
-let FUN_START = ''; // 起算月 yyyy/MM；Settings 分頁「娛樂津貼起算」可覆蓋，沒設就從第一筆記帳的月份開始
+let FUN_START = '2026/10'; // 起算月 yyyy/MM：預設從 2026/10 開始累積；Settings 分頁「娛樂津貼起算」可覆蓋
 function expenseCatOptions() { return [...FIN.categories, [FUN_CAT, '🎟️ 娛樂津貼（不算預算）'], [LEND_CAT, '🤝 代墊（幫人墊，不算支出）']]; }
 
 // ===== 收入分類（每月收入圖、儲蓄率、總損益共用同一套規則）=====
@@ -1919,7 +1919,7 @@ function loadExpenseComparison() {
     });
 }
 
-// 娛樂津貼：每個月結束時「預算 − 當月花費」> 0 就存入（超支不扣）；類別「娛樂津貼」的支出從餘額扣
+// 娛樂津貼：每月「預算 − 當月花費」有剩就存入、超支則從津貼扣；類別「娛樂津貼」的支出也從餘額扣
 function computeFunAllowance(expData){
     const spent={}, used={};
     (expData||[]).forEach(r=>{
@@ -1935,10 +1935,11 @@ function computeFunAllowance(expData){
     let start=FUN_START||months[0]||cur; if(start>cur) start=cur;
     const rows=[]; let bal=0;
     for(let ym=start, guard=0; ym<=cur&&guard<600; ym=ymAdd(ym,1), guard++){
-        const s=spent[ym]||0, u=used[ym]||0, closed=ym<cur, left=Math.max(0,MONTHLY_BUDGET-s);
-        const dep=closed?left:0; // 本月還沒結束，先不存入
+        const s=spent[ym]||0, u=used[ym]||0, closed=ym<cur, diff=MONTHLY_BUDGET-s;
+        // 有剩：月底才存入(本月進行中先不算)；超支：立即從津貼扣(負，本月也扣)
+        const dep = diff>=0 ? (closed?diff:0) : diff;
         bal+=dep-u;
-        rows.push({ym, spent:s, used:u, dep, proj:closed?0:left, closed, bal});
+        rows.push({ym, spent:s, used:u, dep, proj:closed?0:diff, closed, bal});
     }
     return {rows, bal};
 }
@@ -1950,7 +1951,9 @@ function renderFunAllowance(expData){
     const cur=rows[rows.length-1], hint=document.getElementById('funHint');
     if(hint&&cur){
         hint.innerHTML=`每月預算 $${MONTHLY_BUDGET.toLocaleString()}・本月目前花了 ${money(cur.spent)}，`
-            +(cur.proj>0?`月底預計存入 <b style="color:#8e24aa;">+${money(cur.proj)}</b>`:`已用完預算，本月不會存入`)
+            +(cur.proj>0?`月底預計存入 <b style="color:#8e24aa;">+${money(cur.proj)}</b>`
+              :cur.proj<0?`超支 <b style="color:#e53935;">${money(-cur.proj)}</b>，已從津貼扣`
+              :`剛好用完預算`)
             +(cur.used?`・本月已動用 ${money(cur.used)}`:'')
             +(bal<0?`<br><span style="color:#e53935;">⚠️ 娛樂津貼已透支 ${money(-bal)}</span>`:'');
     }
@@ -1959,8 +1962,9 @@ function renderFunAllowance(expData){
     const td='padding:7px 3px;text-align:right;white-space:nowrap;', sub=t=>`<br><span style="font-size:0.8em;font-weight:normal;">${t}</span>`;
     body.innerHTML=rows.slice().reverse().map(r=>{
         const over=r.spent>MONTHLY_BUDGET;
-        const depCell=r.closed?(r.dep>0?`<span style="color:#2e7d32;">+${money(r.dep)}</span>`:'<span style="color:#aaa;">—</span>')
-            :`<span style="color:#aaa;">+${money(r.proj)}${sub('預計')}</span>`;
+        const depCell=r.closed
+            ?(r.dep>0?`<span style="color:#2e7d32;">+${money(r.dep)}</span>`:r.dep<0?`<span style="color:#e53935;">${money(r.dep)}</span>`:'<span style="color:#aaa;">—</span>')
+            :(r.proj>0?`<span style="color:#aaa;">+${money(r.proj)}${sub('預計')}</span>`:r.proj<0?`<span style="color:#e53935;">${money(r.proj)}${sub('預計扣')}</span>`:'<span style="color:#aaa;">—</span>');
         return `<tr style="border-bottom:1px solid #eee;">`
             +`<td style="padding:7px 3px;white-space:nowrap;font-weight:bold;">${r.ym}${r.closed?'':`<span style="color:#8e24aa;">${sub('進行中')}</span>`}</td>`
             +`<td style="${td}${over?'color:#e53935;':''}">${money(r.spent)}${over?sub('超支'):''}</td>`
