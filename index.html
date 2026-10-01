@@ -227,7 +227,7 @@
                     <div id="budgetMessage" style="font-size:0.8em;margin-top:5px;font-weight:bold;text-align:right;">計算中...</div>
                 </div>
                 <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.3);font-size:0.85em;">
-                    本月儲蓄率：<b id="savingsRateDisplay">...</b> ・ 🎟️ 娛樂津貼：<b id="funBalanceMini">...</b>
+                    本月儲蓄率：<b id="savingsRateDisplay">...</b> ・ 🎟️ 娛樂津貼：<b id="funBalanceMini">...</b><span id="lendOutstandingWrap" style="display:none;"> ・ 🤝 待收回：<b id="lendOutstandingMini">$0</b></span>
                 </div>
             </div>
         </div>
@@ -629,8 +629,10 @@ const OPTIONS = {
 
 // ===== 娛樂津貼：記帳類別選它＝從娛樂津貼支出，不佔當月預算 =====
 const FUN_CAT = '娛樂津貼';
+const LEND_CAT = '代墊';          // 支出：幫別人墊錢，不算自己支出(帳戶照扣)
+const LEND_BACK_CAT = '代墊收回';  // 收入：對方還錢，不算自己收入(帳戶照加)
 let FUN_START = ''; // 起算月 yyyy/MM；Settings 分頁「娛樂津貼起算」可覆蓋，沒設就從第一筆記帳的月份開始
-function expenseCatOptions() { return [...FIN.categories, [FUN_CAT, '🎟️ 娛樂津貼（不算預算）']]; }
+function expenseCatOptions() { return [...FIN.categories, [FUN_CAT, '🎟️ 娛樂津貼（不算預算）'], [LEND_CAT, '🤝 代墊（幫人墊，不算支出）']]; }
 
 // ===== 收入分類（每月收入圖、儲蓄率、總損益共用同一套規則）=====
 // 新紀錄：收支=收入，類別直接選下面的 cat（當沖收入可為負＝虧損）
@@ -653,8 +655,9 @@ const INCOME_GROUPS = (() => { const seen={}, arr=[]; INCOME_KINDS.forEach(t => 
 const INCOME_MATCH_ORDER = ['rebate','daytrade','stock','dividend','interest','salary','other']; // 比對順序：退手續費/當沖 先於 股票(^買賣)
 function incomeKindOf(cat, item) {
     cat = String(cat || '').trim(); item = String(item || '').trim();
+    if (cat === LEND_BACK_CAT) return null; // 代墊收回不是真實收入
     let t = INCOME_KINDS.find(x => x.cat === cat); if (t) return t.k;
-    if (!item || /^轉入|^轉出|領錢|存錢|換匯/.test(item)) return null; // 轉帳不是收入
+    if (!item || /^轉入|^轉出|領錢|存錢|換匯|^代墊收回/.test(item)) return null; // 轉帳、代墊收回不是收入
     t = INCOME_KINDS.find(x => item.startsWith(x.cat)); if (t) return t.k;
     const k = INCOME_MATCH_ORDER.find(k => INCOME_KIND[k].re.test(item));
     return k || null;
@@ -1220,7 +1223,7 @@ function syncExpForm() {
     const isInc = document.getElementById('expType').value === '收入';
     const cat = document.getElementById('expCategory'), acc = document.getElementById('expAccount');
     const cv = cat.value, av = acc.value;
-    fillSelect('expCategory', isInc ? INCOME_KINDS.map(t => [t.cat, t.icon + ' ' + t.cat]) : expenseCatOptions());
+    fillSelect('expCategory', isInc ? INCOME_KINDS.map(t => [t.cat, t.icon + ' ' + t.cat]).concat([[LEND_BACK_CAT, '🤝 ' + LEND_BACK_CAT + '（不算收入）']]) : expenseCatOptions());
     const accs = isInc ? [...new Set([...OPTIONS.incAccount, ...OPTIONS.expAccount])] : OPTIONS.expAccount;
     fillSelect('expAccount', accs.map(v => [v, accLabel(v)]));
     if ([...cat.options].some(o => o.value === cv)) cat.value = cv;
@@ -1229,7 +1232,7 @@ function syncExpForm() {
 function buildSelects() {
     fillSelect('expAccount',    OPTIONS.expAccount.map(v => [v, accLabel(v)]));
     fillSelect('expCategory',   expenseCatOptions());
-    fillSelect('incType',       INCOME_KINDS.map(t => [t.cat, t.icon + ' ' + t.cat + (t.neg ? '（賠錢填負數）' : '')]));
+    fillSelect('incType',       INCOME_KINDS.map(t => [t.cat, t.icon + ' ' + t.cat + (t.neg ? '（賠錢填負數）' : '')]).concat([[LEND_BACK_CAT, '🤝 ' + LEND_BACK_CAT + '（不算收入）']]));
     fillSelect('incAccount',    OPTIONS.incAccount.map(v => [v, accLabel(v)]));
     fillSelect('transFrom',     OPTIONS.transFrom.map(v => [v, accLabel(v)]));
     fillSelect('transTo',       OPTIONS.transTo.map(v => [v, accLabel(v)]));
@@ -1239,8 +1242,8 @@ function buildSelects() {
     const rf = document.getElementById('recordFilter');
     if (rf) {
         rf.innerHTML = '<option value="ALL">全部</option>'
-            + '<optgroup label="📂 類別">' + FIN.categories.concat([FUN_CAT]).map(c => `<option value="CAT_${esc(c)}">${esc(c)}</option>`).join('') + '</optgroup>'
-            + '<optgroup label="💵 收入">' + INCOME_KINDS.map(t => `<option value="CAT_${esc(t.cat)}">${esc(t.cat)}</option>`).join('') + '</optgroup>'
+            + '<optgroup label="📂 類別">' + FIN.categories.concat([FUN_CAT, LEND_CAT]).map(c => `<option value="CAT_${esc(c)}">${esc(c)}</option>`).join('') + '</optgroup>'
+            + '<optgroup label="💵 收入">' + INCOME_KINDS.map(t => `<option value="CAT_${esc(t.cat)}">${esc(t.cat)}</option>`).concat([`<option value="CAT_${esc(LEND_BACK_CAT)}">${esc(LEND_BACK_CAT)}</option>`]).join('') + '</optgroup>'
             + '<optgroup label="💳 帳戶">' + OPTIONS.filterAccounts.map(v => `<option value="ACC_${esc(v)}">${esc(accLabel(v))}</option>`).join('') + '</optgroup>';
     }
 }
@@ -1795,7 +1798,7 @@ function quickFill(item,category,amount,account){
 }
 
 // 動態常用項目：依歷史記帳頻率排序，並帶入每個項目「最近一次」的類別/帳戶/金額
-const CAT_EMOJI = {食:'🍱',衣:'👕',住:'🏠',行:'🚆',育樂:'🎮',其他:'🛒',[FUN_CAT]:'🎟️'};
+const CAT_EMOJI = {食:'🍱',衣:'👕',住:'🏠',行:'🚆',育樂:'🎮',其他:'🛒',[FUN_CAT]:'🎟️',[LEND_CAT]:'🤝',[LEND_BACK_CAT]:'🤝'};
 function renderQuickButtons(){
     const box=document.getElementById('quickFillBox');
     if(!box) return;
@@ -1862,10 +1865,13 @@ function loadExpenseComparison() {
         const cats=FIN.categories;
         let tm={total:0},lm={total:0},funThisMonth=0; cats.forEach(c=>{tm[c]=0;lm[c]=0;});
 
+        let lendOut=0; // 代墊未收回＝Σ代墊支出 − Σ代墊收回（跨月累計到現在）
         data.forEach(row=>{
-            if(row.收支!=="支出") return;
             let rKey=ymOf(row.日期), cat=String(fCategory(row)).trim(), amt=n(row.金額);
-            if(cat===FUN_CAT){ if(rKey===cmKey) funThisMonth+=amt; return; } // 娛樂津貼支出另計，不佔當月預算
+            if(row.收支==="收入"){ if(cat===LEND_BACK_CAT) lendOut-=amt; return; } // 代墊收回：沖銷未收回，不算收入
+            if(row.收支!=="支出") return;
+            if(cat===LEND_CAT){ lendOut+=amt; return; }                       // 代墊：不算支出/預算，只累計未收回
+            if(cat===FUN_CAT){ if(rKey===cmKey) funThisMonth+=amt; return; }   // 娛樂津貼支出另計，不佔當月預算
             let c=cats.includes(cat)?cat:"其他";
             if(rKey===cmKey){tm[c]+=amt;tm.total+=amt;}
             else if(rKey===lmKey){lm[c]+=amt;lm.total+=amt;}
@@ -1892,6 +1898,10 @@ function loadExpenseComparison() {
             } else srEl.innerText="無收入資料";
         }
 
+        // 待收回（代墊未收回總額）
+        const lendEl=document.getElementById('lendOutstandingMini'), lendWrap=document.getElementById('lendOutstandingWrap');
+        if(lendEl&&lendWrap){ if(Math.round(lendOut)!==0){ lendEl.innerText=money(lendOut); lendWrap.style.display=''; } else lendWrap.style.display='none'; }
+
         document.getElementById('lastMonthTotalDisplay').innerText="$"+lm.total.toLocaleString();
         let diff=tm.total-lm.total;
         document.getElementById('totalDiff').innerHTML=diff>0?`<span style="color:red">多花 $${diff.toLocaleString()}</span>`:`<span style="color:green">省下 $${Math.abs(diff).toLocaleString()}</span>`;
@@ -1916,7 +1926,9 @@ function computeFunAllowance(expData){
         if(r.收支!=="支出") return;
         const ym=ymOf(r.日期); if(!ym) return;
         const amt=n(r.金額);
-        if(String(fCategory(r)).trim()===FUN_CAT) used[ym]=(used[ym]||0)+amt;
+        const c=String(fCategory(r)).trim();
+        if(c===LEND_CAT) return;            // 代墊不是花掉的錢，不佔預算
+        if(c===FUN_CAT) used[ym]=(used[ym]||0)+amt;
         else spent[ym]=(spent[ym]||0)+amt;
     });
     const cur=ymNow(), months=Object.keys(spent).concat(Object.keys(used)).sort();
