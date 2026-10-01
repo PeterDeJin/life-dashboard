@@ -441,7 +441,7 @@
                     <ul id="incomeRecordList" style="list-style:none;padding:0;margin:0;max-height:220px;overflow-y:auto;"></ul>
                 </div>
             </div>
-            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">點長條可切換到那個月。收入一律用「＋ 記收入」或日常記帳選「收入」來記，類別選薪資 / 當沖收入 / 當沖退手續費 / 股利 / 利息 / 其他收入；當沖賠錢就填負數。以前記在資產流水帳（Asset_Log）的薪水、股利、買賣XXXX 也會照關鍵字算進來。</div>
+            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">點長條可切換到那個月。收入一律用「＋ 記收入」或日常記帳選「收入」來記，類別選薪資 / 當沖收入 / 當沖退手續費 / 股票收入 / 股利 / 利息 / 其他收入；當沖與股票買賣賠錢就填負數（圖上當沖與退手續費合併成一條「當沖」）。以前記在資產流水帳（Asset_Log）的薪水、股利、買賣XXXX（算股票收入）也會照關鍵字算進來。</div>
         </div>
 
         <div class="card full-width">
@@ -636,16 +636,21 @@ function expenseCatOptions() { return [...FIN.categories, [FUN_CAT, '🎟️ 娛
 // 新紀錄：收支=收入，類別直接選下面的 cat（當沖收入可為負＝虧損）
 // 舊紀錄：類別不是這些時，改看項目名稱開頭或關鍵字（相容以前 Asset_Log 的「薪水」「股利」「買賣2330」等）
 // color/dark：圖表配色（固定跟著類型走，不隨排序變）
+// grp = 顯示分組(圖表/統計把同組合併成一條)；neg = 允許負數(當沖、股票買賣可賠錢)
 const INCOME_KINDS = [
-    { k:'salary',   cat:'薪資',         label:'薪資',     icon:'💼', color:'#2a78d6', dark:'#3987e5', re:/薪|工讀|獎金|監考|家教|助教|打工/ },
-    { k:'daytrade', cat:'當沖收入',     label:'當沖',     icon:'⚡', color:'#eb6834', dark:'#d95926', re:/當沖|^買賣/ },
-    { k:'rebate',   cat:'當沖退手續費', label:'退手續費', icon:'↩️', color:'#1baf7a', dark:'#199e70', re:/退手續費|手續費退|退佣/ },
-    { k:'dividend', cat:'股利',         label:'股利',     icon:'🌱', color:'#eda100', dark:'#c98500', re:/股利|股息|配息/ },
-    { k:'interest', cat:'利息',         label:'利息',     icon:'🏦', color:'#e87ba4', dark:'#d55181', re:/利息/ },
-    { k:'other',    cat:'其他收入',     label:'其他',     icon:'🎁', color:'#008300', dark:'#008300', re:/^其他收入|普發/ },
+    { k:'salary',   grp:'salary',   cat:'薪資',         label:'薪資',     icon:'💼', color:'#2a78d6', dark:'#3987e5', re:/薪|工讀|獎金|監考|家教|助教|打工/ },
+    { k:'daytrade', grp:'daytrade', cat:'當沖收入',     label:'當沖',     icon:'⚡', color:'#eb6834', dark:'#d95926', re:/當沖/, neg:true },
+    { k:'rebate',   grp:'daytrade', cat:'當沖退手續費', label:'退手續費', icon:'↩️', color:'#1baf7a', dark:'#199e70', re:/退手續費|手續費退|退佣/ },
+    { k:'stock',    grp:'stock',    cat:'股票收入',     label:'股票',     icon:'📈', color:'#8e44ad', dark:'#a569bd', re:/^買賣/, neg:true },
+    { k:'dividend', grp:'dividend', cat:'股利',         label:'股利',     icon:'🌱', color:'#eda100', dark:'#c98500', re:/股利|股息|配息/ },
+    { k:'interest', grp:'interest', cat:'利息',         label:'利息',     icon:'🏦', color:'#e87ba4', dark:'#d55181', re:/利息/ },
+    { k:'other',    grp:'other',    cat:'其他收入',     label:'其他',     icon:'🎁', color:'#008300', dark:'#008300', re:/^其他收入|普發/ },
 ];
 const INCOME_KIND = Object.fromEntries(INCOME_KINDS.map(t => [t.k, t]));
-const INCOME_MATCH_ORDER = ['rebate','daytrade','dividend','interest','salary','other']; // 關鍵字比對順序：「當沖退手續費」要先於「當沖」
+const KIND_GRP = Object.fromEntries(INCOME_KINDS.map(t => [t.k, t.grp]));
+// 顯示用分組：當沖收入＋當沖退手續費 → 一條「當沖」；每組取第一個出現的 kind 當代表(label/color)
+const INCOME_GROUPS = (() => { const seen={}, arr=[]; INCOME_KINDS.forEach(t => { if(!seen[t.grp]){ seen[t.grp]={grp:t.grp,label:t.label,color:t.color,dark:t.dark,icon:t.icon,neg:!!t.neg}; arr.push(seen[t.grp]); } else if(t.neg) seen[t.grp].neg=true; }); return arr; })();
+const INCOME_MATCH_ORDER = ['rebate','daytrade','stock','dividend','interest','salary','other']; // 比對順序：退手續費/當沖 先於 股票(^買賣)
 function incomeKindOf(cat, item) {
     cat = String(cat || '').trim(); item = String(item || '').trim();
     let t = INCOME_KINDS.find(x => x.cat === cat); if (t) return t.k;
@@ -658,9 +663,13 @@ function incomeKindOf(cat, item) {
 function collectIncome(logData, expData) {
     const out = [];
     (Array.isArray(logData) ? logData : []).forEach(r => {
-        const kind = incomeKindOf('', fItem(r)); if (!kind) return;
+        const item = String(fItem(r)).trim(), acc = String(r.帳戶 || '');
         const ym = ymOf(r.日期), amt = n(r.金額); if (!ym || !amt) return;
-        out.push({ src:'asset', ym, date:formatDate(r.日期), kind, item:String(fItem(r)), acc:String(r.帳戶 || ''), amt });
+        let kind = incomeKindOf('', item);
+        // 股票已實現損益(完整分錄)：賣出實收(富邦銀行「賣XXXX」正) + 賣出扣成本(富邦證券 負金額) 相加＝該檔損益，歸到賣出月
+        if (!kind && ((acc === '富邦銀行' && /^賣/.test(item)) || (acc === '富邦證券' && amt < 0))) kind = 'stock';
+        if (!kind) return;
+        out.push({ src:'asset', ym, date:formatDate(r.日期), kind, item, acc, amt });
     });
     (Array.isArray(expData) ? expData : []).forEach(r => {
         if (r.收支 !== '收入') return;
@@ -1220,7 +1229,7 @@ function syncExpForm() {
 function buildSelects() {
     fillSelect('expAccount',    OPTIONS.expAccount.map(v => [v, accLabel(v)]));
     fillSelect('expCategory',   expenseCatOptions());
-    fillSelect('incType',       INCOME_KINDS.map(t => [t.cat, t.icon + ' ' + t.cat + (t.k === 'daytrade' ? '（賠錢填負數）' : '')]));
+    fillSelect('incType',       INCOME_KINDS.map(t => [t.cat, t.icon + ' ' + t.cat + (t.neg ? '（賠錢填負數）' : '')]));
     fillSelect('incAccount',    OPTIONS.incAccount.map(v => [v, accLabel(v)]));
     fillSelect('transFrom',     OPTIONS.transFrom.map(v => [v, accLabel(v)]));
     fillSelect('transTo',       OPTIONS.transTo.map(v => [v, accLabel(v)]));
@@ -1674,7 +1683,7 @@ function loadAssetChart() {
         });
         const incomeRecs=collectIncome(logData, expData);
         const sumKind=(...ks)=>incomeRecs.filter(r=>ks.includes(r.kind)).reduce((s,r)=>s+r.amt,0);
-        const tradeNetPnL=sumKind('daytrade','rebate'), divs=sumKind('dividend'); // 當沖淨損益＋退手續費、股利
+        const tradeNetPnL=sumKind('daytrade','rebate'), divs=sumKind('dividend'); // 當沖淨損益＋退手續費、股利（股票已實現損益已由 positionProceeds−totalBuyCost 體現，不在此重複計）
 
         const palette=['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40','#C9CBCF','#E7E9ED','#76D7C4','#F1948A'];
         let labels=[], values=[], colors=[], holdRows=[], beta=null;
@@ -1958,20 +1967,20 @@ function loadMonthlyIncome() {
         const recs=collectIncome(logData, expData);
         globalIncomeRecs=recs;
         const byM={};
-        recs.forEach(r=>{ const m=byM[r.ym]||(byM[r.ym]={}); m[r.kind]=(m[r.kind]||0)+r.amt; });
+        recs.forEach(r=>{ const gp=KIND_GRP[r.kind]; const m=byM[r.ym]||(byM[r.ym]={}); m[gp]=(m[gp]||0)+r.amt; });
         const cur=ymNow(), keys=Object.keys(byM).sort();
         let last=cur; if(keys.length&&keys[keys.length-1]>last) last=keys[keys.length-1];
         let first=ymAdd(last,-11); if(keys.length&&keys[0]>first) first=keys[0];
         const months=[]; for(let ym=first, g=0; ym<=last&&g<24; ym=ymAdd(ym,1), g++) months.push(ym);
 
         const dark=document.body.classList.contains('dark'), surface=dark?'#1e1e1e':'#ffffff';
-        const val=(m,k)=>Math.round((byM[m]||{})[k]||0);
-        const datasets=INCOME_KINDS.filter(t=>months.some(m=>val(m,t.k)!==0)).map(t=>({
-            type:'bar', label:t.label, data:months.map(m=>val(m,t.k)),
+        const val=(m,g)=>Math.round((byM[m]||{})[g]||0);
+        const datasets=INCOME_GROUPS.filter(t=>months.some(m=>val(m,t.grp)!==0)).map(t=>({
+            type:'bar', label:t.label, data:months.map(m=>val(m,t.grp)),
             backgroundColor:dark?t.dark:t.color, borderColor:surface, borderWidth:2, borderSkipped:'start', borderRadius:4, stack:'inc'
         }));
         const lineCol=dark?'#c3c2b7':'#52514e';
-        datasets.push({ type:'line', label:'合計', data:months.map(m=>INCOME_KINDS.reduce((s,t)=>s+val(m,t.k),0)),
+        datasets.push({ type:'line', label:'合計', data:months.map(m=>INCOME_GROUPS.reduce((s,t)=>s+val(m,t.grp),0)),
             borderColor:lineCol, backgroundColor:lineCol, borderWidth:2, pointRadius:4, pointHoverRadius:6, tension:0.2, stack:'total', order:-1 });
 
         const ctx=document.getElementById('incomeSourceChart');
@@ -1995,9 +2004,9 @@ function renderIncomeMonth(){
     const total=recs.reduce((s,r)=>s+r.amt,0), tEl=document.getElementById('incomeMonthTotal');
     if(tEl){ tEl.innerText=money(total); tEl.style.color=total<0?'#e53935':''; }
     const dark=document.body.classList.contains('dark'), sums={};
-    recs.forEach(r=>{ sums[r.kind]=(sums[r.kind]||0)+r.amt; });
+    recs.forEach(r=>{ const g=KIND_GRP[r.kind]; sums[g]=(sums[g]||0)+r.amt; });
     const bd=document.getElementById('incomeBreakdown');
-    if(bd) bd.innerHTML=INCOME_KINDS.filter(t=>sums[t.k]).map(t=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:0.85em;background:#f8f9fa;border:1px solid #eee;border-radius:12px;padding:3px 10px;color:#555;"><span style="width:9px;height:9px;border-radius:50%;background:${dark?t.dark:t.color};"></span>${t.label} <b style="color:#333;">${money(sums[t.k], t.k==='daytrade')}</b></span>`).join('');
+    if(bd) bd.innerHTML=INCOME_GROUPS.filter(t=>sums[t.grp]).map(t=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:0.85em;background:#f8f9fa;border:1px solid #eee;border-radius:12px;padding:3px 10px;color:#555;"><span style="width:9px;height:9px;border-radius:50%;background:${dark?t.dark:t.color};"></span>${t.label} <b style="color:#333;">${money(sums[t.grp], t.neg)}</b></span>`).join('');
     const list=document.getElementById('incomeRecordList'); if(!list) return;
     if(!recs.length){ list.innerHTML='<li style="color:#aaa;text-align:center;padding:12px;">這個月還沒有收入紀錄</li>'; return; }
     list.innerHTML=recs.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(r=>{
@@ -2016,12 +2025,13 @@ function toggleIncomeForm(){
 function onIncomeTypeChange(){
     const type=document.getElementById('incType').value, acc=document.getElementById('incAccount');
     let saved=null; try{ saved=localStorage.getItem('INC_ACC_'+type); }catch(e){}
-    const def=saved||(/當沖|股利/.test(type)?'富邦銀行':OPTIONS.incAccount[0]); // 記住每種收入上次用的帳戶
+    const def=saved||(/當沖|股利|股票/.test(type)?'富邦銀行':OPTIONS.incAccount[0]); // 記住每種收入上次用的帳戶
     if([...acc.options].some(o=>o.value===def)) acc.value=def;
+    const kindDef=INCOME_KINDS.find(x=>x.cat===type), allowNeg=!!(kindDef&&kindDef.neg);
     const amt=document.getElementById('incAmount'), hint=document.getElementById('incHint');
-    const isDay=type==='當沖收入';
-    amt.placeholder=isDay?'賺填正數，賠填負數（如 -1200）':'金額';
-    hint.innerHTML=isDay?'⚡ 填當天（或這段期間）的當沖<b>淨損益</b>，券商 App 顯示的當沖損益通常已扣手續費與交易稅，照填即可；賠錢記得加負號。'
+    amt.placeholder=allowNeg?'賺填正數，賠填負數（如 -1200）':'金額';
+    hint.innerHTML=type==='當沖收入'?'⚡ 填當天（或這段期間）的當沖<b>淨損益</b>，券商 App 顯示的當沖損益通常已扣手續費與交易稅，照填即可；賠錢記得加負號。'
+        :type==='股票收入'?'📈 填這筆股票買賣的<b>淨損益</b>（賣出 − 成本，已含手續費與交易稅）；賠錢記得加負號。'
         :type==='當沖退手續費'?'↩️ 券商退回的當沖手續費（通常每月一次），填正數。'
         :type==='薪資'?'💼 實際入帳的薪水（扣完勞健保後的金額）。':'';
 }
@@ -2030,13 +2040,14 @@ function submitIncome(btn){
     const note=document.getElementById('incNote').value.trim(), raw=n(document.getElementById('incAmount').value);
     if(!date){ toast('請選擇日期','error'); return; }
     if(!raw){ toast('請輸入金額','error'); return; }
-    const amount=type==='當沖收入'?raw:Math.abs(raw); // 只有當沖可以是負的
+    const kindDef=INCOME_KINDS.find(x=>x.cat===type), allowNeg=!!(kindDef&&kindDef.neg);
+    const amount=allowNeg?raw:Math.abs(raw); // 當沖、股票買賣可為負
     const item=note?`${type} ${note}`:type;
     btn.disabled=true; btn.innerText='寫入中...';
     const reset=()=>{ btn.disabled=false; btn.innerText='記一筆收入'; };
     apiPost({tab:'Expenses_DB',date,type:'收入',account,category:type,item,amount,id:newId()}).then(d=>{
         if(d.includes('Success')){
-            toast(`💵 已記 ${type} ${money(amount, type==='當沖收入')}`,'success');
+            toast(`💵 已記 ${type} ${money(amount, allowNeg)}`,'success');
             try{ localStorage.setItem('INC_ACC_'+type, account); }catch(e){}
             document.getElementById('incAmount').value=''; document.getElementById('incNote').value='';
             incomeYm=ymOf(date)||incomeYm;
