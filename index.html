@@ -304,21 +304,35 @@
                 </div>
             </div>
             <div id="funHint" style="font-size:0.85em;color:#666;margin:10px 0;"></div>
+            <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin:6px 0 14px;">
+                <div style="position:relative;width:104px;height:150px;flex:none;border:3px solid #d9cde8;border-top:none;border-radius:0 0 16px 16px;background:#faf8fe;overflow:hidden;">
+                    <div id="funTankSave" style="position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(#6ad694,#3cb371);transition:height .6s;"></div>
+                    <div id="funTankOpen" style="position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(#6aa6ec,#2a78d6);transition:height .6s,bottom .6s;"></div>
+                    <div id="funTankPct" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:bold;color:#555;font-size:1.15rem;text-shadow:0 1px 3px #fff;">0%</div>
+                </div>
+                <div style="flex:1;min-width:150px;font-size:0.9em;line-height:1.9;">
+                    <div><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#2a78d6;vertical-align:middle;"></span> 開源 <b id="funOpenTotal" style="color:#2a78d6;">$0</b></div>
+                    <div><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#3cb371;vertical-align:middle;"></span> 節源 <b id="funSaveTotal" style="color:#3cb371;">$0</b></div>
+                    <div style="color:#e91e63;">🎟️ 已動用 <b id="funUsedTotal">$0</b></div>
+                    <div style="border-top:1px solid #eee;margin-top:3px;padding-top:3px;color:#888;">目標 <b id="funTargetLabel" style="color:#555;">$0</b></div>
+                </div>
+            </div>
             <div style="max-height:300px;overflow-y:auto;">
                 <table style="width:100%;border-collapse:collapse;font-size:0.85em;">
                     <thead>
                         <tr style="border-bottom:2px solid #ddd;text-align:right;">
                             <th style="padding:6px 3px;text-align:left;">月份</th>
                             <th style="padding:6px 3px;">花費</th>
-                            <th style="padding:6px 3px;">存入</th>
+                            <th style="padding:6px 3px;color:#2a78d6;">開源</th>
+                            <th style="padding:6px 3px;color:#3cb371;">節源</th>
                             <th style="padding:6px 3px;">動用</th>
                             <th style="padding:6px 3px;">累計</th>
                         </tr>
                     </thead>
-                    <tbody id="funTableBody"><tr><td colspan="5" style="color:#888;padding:8px;">計算中...</td></tr></tbody>
+                    <tbody id="funTableBody"><tr><td colspan="6" style="color:#888;padding:8px;">計算中...</td></tr></tbody>
                 </table>
             </div>
-            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">規則：每月「預算 − 當月花費」有剩就存進來；超支的話，超出的部分先從娛樂津貼扣。要花這筆錢時，記帳類別選「🎟️ 娛樂津貼」，會從這裡扣、不算進當月預算。目前從 2026/10 起算，想改起算月份，在 Settings 分頁加一列「娛樂津貼起算｜2026/10」。</div>
+            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">規則：水缸每月累積兩種水——🔵 開源＝當月總收入超過 45,000（預計花 25,000＋投資 20,000）的部分；🟢 節源＝當月花費低於 25,000 省下的部分（超支則倒扣）。要花這筆錢時，記帳類別選「🎟️ 娛樂津貼」，會從水缸扣、不算進當月花費。目前從 2026/10 起算；在 Settings 分頁加「娛樂津貼目標｜50000」設水缸容量、「娛樂津貼起算｜2026/10」改起算月。</div>
         </div>
 
         <div class="card">
@@ -635,6 +649,10 @@ const FUN_CAT = '娛樂津貼';
 const LEND_CAT = '代墊';          // 支出：幫別人墊錢，不算自己支出(帳戶照扣)
 const LEND_BACK_CAT = '代墊收回';  // 收入：對方還錢，不算自己收入(帳戶照加)
 let FUN_START = '2026/10'; // 起算月 yyyy/MM：預設從 2026/10 開始累積；Settings 分頁「娛樂津貼起算」可覆蓋
+const FUN_LIVING = 25000;      // 預計每月生活花費（節源基準：花低於此，省下的進水缸）
+const FUN_INVEST = 20000;      // 每月固定投資
+const FUN_INCOME_BASE = 45000; // 開源基準＝生活+投資（當月收入超過此，多的進水缸）
+let FUN_TARGET = 50000;        // 水缸目標金額；Settings 分頁「娛樂津貼目標」可覆蓋
 function expenseCatOptions() { return [...FIN.categories, [FUN_CAT, '🎟️ 娛樂津貼（不算預算）'], [LEND_CAT, '🤝 代墊（幫人墊，不算支出）']]; }
 
 // ===== 收入分類（每月收入圖、儲蓄率、總損益共用同一套規則）=====
@@ -1260,6 +1278,7 @@ async function loadSettings() {
             const key = String(r.項目 || r.設定 || r.名稱 || r.key || "").trim();
             const valRaw = (r.數值 !== undefined) ? r.數值 : (r.值 !== undefined ? r.值 : r.value);
             if (/娛樂/.test(key) && /起算|開始|起始/.test(key)) { const ym = ymOf(valRaw); if (ym) FUN_START = ym; return; } // 例：娛樂津貼起算｜2026/09
+            if (/娛樂/.test(key) && /目標/.test(key)) { const v = n(valRaw); if (v > 0) FUN_TARGET = v; return; } // 例：娛樂津貼目標｜50000（要先於下面的通用「目標」判斷）
             const val = n(valRaw);
             if (!key || !val) return;
             if (/目標|桶金|goal/i.test(key))   SAVING_GOAL = val;
@@ -1928,63 +1947,76 @@ function loadExpenseComparison() {
             let ds=d>0?`<span style="color:red">▲ ${d}</span>`:d<0?`<span style="color:green">▼ ${Math.abs(d)}</span>`:"–";
             body.innerHTML+=`<tr><td style="padding:8px;font-weight:bold;">${c}</td><td style="padding:8px;">$${v1}</td><td style="padding:8px;color:#888;">$${v2}</td><td style="padding:8px;">${ds}</td></tr>`;
         });
-        renderFunAllowance(data);
+        renderFunAllowance(logData, data);
     });
 }
 
-// 娛樂津貼：每月「預算 − 當月花費」有剩就存入、超支則從津貼扣；類別「娛樂津貼」的支出也從餘額扣
-function computeFunAllowance(expData){
-    const spent={}, used={};
+// 娛樂津貼水缸：每月累積 開源(當月收入超過45000的部分) + 節源(25000−當月花費，超支為負)；「娛樂津貼」類別支出為動用
+function computeFunAllowance(logData, expData){
+    const incByM={}, spent={}, used={};
+    collectIncome(logData, expData).forEach(r=>{ incByM[r.ym]=(incByM[r.ym]||0)+r.amt; }); // 當月總收入(含投資收益)
     (expData||[]).forEach(r=>{
         if(r.收支!=="支出") return;
         const ym=ymOf(r.日期); if(!ym) return;
-        const amt=n(r.金額);
-        const c=String(fCategory(r)).trim();
-        if(c===LEND_CAT) return;            // 代墊不是花掉的錢，不佔預算
-        if(c===FUN_CAT) used[ym]=(used[ym]||0)+amt;
-        else spent[ym]=(spent[ym]||0)+amt;
+        const amt=n(r.金額), c=String(fCategory(r)).trim();
+        if(c===LEND_CAT) return;                     // 代墊不是花掉的錢
+        if(c===FUN_CAT) used[ym]=(used[ym]||0)+amt;  // 動用津貼
+        else spent[ym]=(spent[ym]||0)+amt;           // 生活花費
     });
-    const cur=ymNow(), months=Object.keys(spent).concat(Object.keys(used)).sort();
+    const cur=ymNow();
+    const months=[...new Set([...Object.keys(incByM),...Object.keys(spent),...Object.keys(used)])].sort();
     let start=FUN_START||months[0]||cur; if(start>cur) start=cur;
-    const rows=[]; let bal=0;
+    const rows=[]; let openTotal=0, saveTotal=0, usedTotal=0, bal=0;
     for(let ym=start, guard=0; ym<=cur&&guard<600; ym=ymAdd(ym,1), guard++){
-        const s=spent[ym]||0, u=used[ym]||0, closed=ym<cur, diff=MONTHLY_BUDGET-s;
-        // 有剩：月底才存入(本月進行中先不算)；超支：立即從津貼扣(負，本月也扣)
-        const dep = diff>=0 ? (closed?diff:0) : diff;
-        bal+=dep-u;
-        rows.push({ym, spent:s, used:u, dep, proj:closed?0:diff, closed, bal});
+        const inc=incByM[ym]||0, s=spent[ym]||0, u=used[ym]||0, closed=ym<cur;
+        const open=Math.max(0, inc-FUN_INCOME_BASE); // 開源：收入超過基準
+        const save=FUN_LIVING-s;                     // 節源：省下(正)／超支(負)
+        openTotal+=open; saveTotal+=save; usedTotal+=u;
+        bal+=open+save-u;
+        rows.push({ym, inc, spent:s, open, save, used:u, closed, bal});
     }
-    return {rows, bal};
+    return {rows, openTotal, saveTotal, usedTotal, bal, target:FUN_TARGET};
 }
-function renderFunAllowance(expData){
-    const {rows, bal}=computeFunAllowance(expData);
+function renderFunAllowance(logData, expData){
+    const {rows, openTotal, saveTotal, usedTotal, bal, target}=computeFunAllowance(logData, expData);
     const balEl=document.getElementById('funBalance'), mini=document.getElementById('funBalanceMini');
     if(balEl){ balEl.innerText=money(bal); balEl.style.color=bal<0?"#e53935":"#8e24aa"; }
     if(mini) mini.innerText=money(bal);
+    // 水缸：水位=餘額/目標，兩色按正來源比例分層（節源在下、開源在上），動用與超支讓水位下降
+    const H=150, posOpen=Math.max(0,openTotal), posSave=Math.max(0,saveTotal), posSum=posOpen+posSave;
+    const waterH=Math.max(0,Math.min(1, target>0?bal/target:0))*H;
+    const openRatio=posSum>0?posOpen/posSum:0;
+    const openH=Math.round(waterH*openRatio), saveH=Math.round(waterH-waterH*openRatio);
+    const set=(id,f)=>{ const el=document.getElementById(id); if(el) f(el); };
+    set('funTankSave', el=>el.style.height=saveH+'px');
+    set('funTankOpen', el=>{ el.style.height=openH+'px'; el.style.bottom=saveH+'px'; });
+    set('funTankPct', el=>el.innerText=(target>0?Math.round(bal/target*100):0)+'%');
+    set('funOpenTotal', el=>el.innerText=money(openTotal));
+    set('funSaveTotal', el=>{ el.innerText=money(saveTotal); el.style.color=saveTotal<0?'#e53935':'#3cb371'; });
+    set('funUsedTotal', el=>el.innerText=money(usedTotal));
+    set('funTargetLabel', el=>el.innerText=money(target));
     const cur=rows[rows.length-1], hint=document.getElementById('funHint');
     if(hint&&cur){
-        hint.innerHTML=`每月預算 $${MONTHLY_BUDGET.toLocaleString()}・本月目前花了 ${money(cur.spent)}，`
-            +(cur.proj>0?`月底預計存入 <b style="color:#8e24aa;">+${money(cur.proj)}</b>`
-              :cur.proj<0?`超支 <b style="color:#e53935;">${money(-cur.proj)}</b>，已從津貼扣`
-              :`剛好用完預算`)
-            +(cur.used?`・本月已動用 ${money(cur.used)}`:'')
-            +(bal<0?`<br><span style="color:#e53935;">⚠️ 娛樂津貼已透支 ${money(-bal)}</span>`:'');
+        hint.innerHTML=`本月 收入 ${money(cur.inc)}、花費 ${money(cur.spent)}`
+            +`・🔵 開源 <b style="color:#2a78d6;">${cur.open>0?'+':''}${money(cur.open)}</b>`
+            +`・🟢 節源 <b style="color:${cur.save<0?'#e53935':'#3cb371'};">${cur.save>=0?'+':''}${money(cur.save)}</b>`
+            +(cur.used?`・動用 ${money(cur.used)}`:'')
+            +(bal<0?`<br><span style="color:#e53935;">⚠️ 水缸已透支 ${money(-bal)}</span>`:'');
     }
     const body=document.getElementById('funTableBody'); if(!body) return;
-    if(!rows.length){ body.innerHTML='<tr><td colspan="5" style="color:#888;padding:8px;">尚無記帳資料</td></tr>'; return; }
+    if(!rows.length){ body.innerHTML='<tr><td colspan="6" style="color:#888;padding:8px;">尚無記帳資料</td></tr>'; return; }
     const td='padding:7px 3px;text-align:right;white-space:nowrap;', sub=t=>`<br><span style="font-size:0.8em;font-weight:normal;">${t}</span>`;
-    body.innerHTML=rows.slice().reverse().map(r=>{
-        const over=r.spent>MONTHLY_BUDGET;
-        const depCell=r.closed
-            ?(r.dep>0?`<span style="color:#2e7d32;">+${money(r.dep)}</span>`:r.dep<0?`<span style="color:#e53935;">${money(r.dep)}</span>`:'<span style="color:#aaa;">—</span>')
-            :(r.proj>0?`<span style="color:#aaa;">+${money(r.proj)}${sub('預計')}</span>`:r.proj<0?`<span style="color:#e53935;">${money(r.proj)}${sub('預計扣')}</span>`:'<span style="color:#aaa;">—</span>');
-        return `<tr style="border-bottom:1px solid #eee;">`
-            +`<td style="padding:7px 3px;white-space:nowrap;font-weight:bold;">${r.ym}${r.closed?'':`<span style="color:#8e24aa;">${sub('進行中')}</span>`}</td>`
-            +`<td style="${td}${over?'color:#e53935;':''}">${money(r.spent)}${over?sub('超支'):''}</td>`
-            +`<td style="${td}">${depCell}</td>`
-            +`<td style="${td}">${r.used?`<span style="color:#e91e63;">-${money(r.used)}</span>`:'<span style="color:#aaa;">—</span>'}</td>`
-            +`<td style="${td}font-weight:bold;${r.bal<0?'color:#e53935;':''}">${money(r.bal)}</td></tr>`;
-    }).join('');
+    const openCell=v=>v>0?`<span style="color:#2a78d6;">+${money(v)}</span>`:'<span style="color:#aaa;">—</span>';
+    const saveCell=v=>v>0?`<span style="color:#3cb371;">+${money(v)}</span>`:v<0?`<span style="color:#e53935;">${money(v)}</span>`:'<span style="color:#aaa;">—</span>';
+    body.innerHTML=rows.slice().reverse().map(r=>
+        `<tr style="border-bottom:1px solid #eee;">`
+        +`<td style="padding:7px 3px;white-space:nowrap;font-weight:bold;">${r.ym}${r.closed?'':`<span style="color:#8e24aa;">${sub('進行中')}</span>`}</td>`
+        +`<td style="${td}${r.spent>FUN_LIVING?'color:#e53935;':''}">${money(r.spent)}</td>`
+        +`<td style="${td}">${openCell(r.open)}</td>`
+        +`<td style="${td}">${saveCell(r.save)}</td>`
+        +`<td style="${td}">${r.used?`<span style="color:#e91e63;">-${money(r.used)}</span>`:'<span style="color:#aaa;">—</span>'}</td>`
+        +`<td style="${td}font-weight:bold;${r.bal<0?'color:#e53935;':''}">${money(r.bal)}</td></tr>`
+    ).join('');
 }
 
 // 功能 8：每月收入（薪資 / 當沖 / 當沖退手續費 / 股利 / 利息 / 其他）
