@@ -332,7 +332,7 @@
                     <tbody id="funTableBody"><tr><td colspan="6" style="color:#888;padding:8px;">計算中...</td></tr></tbody>
                 </table>
             </div>
-            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">規則：水缸每月累積兩種水——🔵 開源＝當月總收入超過 45,000（預計花 25,000＋投資 20,000）的部分；🟢 節源＝當月花費低於 25,000 省下的部分（超支則倒扣）。要花這筆錢時，記帳類別選「🎟️ 娛樂津貼」，會從水缸扣、不算進當月花費。目前從 2026/10 起算；在 Settings 分頁加「娛樂津貼目標｜50000」設水缸容量、「娛樂津貼起算｜2026/10」改起算月。</div>
+            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">規則：水缸每月累積兩種水——🔵 開源＝當月總收入超過「每月預算＋投資 20,000」的部分；🟢 節源＝當月花費低於「每月預算」省下的部分（超支則倒扣）。要花這筆錢時，記帳類別選「🎟️ 娛樂津貼」，會從水缸扣、不算進當月花費。基準跟著 Settings「每月預算」走；水缸容量設「娛樂津貼目標」、起算月設「娛樂津貼起算」。目前從 2026/10 起算。</div>
         </div>
 
         <div class="card">
@@ -649,9 +649,7 @@ const FUN_CAT = '娛樂津貼';
 const LEND_CAT = '代墊';          // 支出：幫別人墊錢，不算自己支出(帳戶照扣)
 const LEND_BACK_CAT = '代墊收回';  // 收入：對方還錢，不算自己收入(帳戶照加)
 let FUN_START = '2026/10'; // 起算月 yyyy/MM：預設從 2026/10 開始累積；Settings 分頁「娛樂津貼起算」可覆蓋
-const FUN_LIVING = 25000;      // 預計每月生活花費（節源基準：花低於此，省下的進水缸）
-const FUN_INVEST = 20000;      // 每月固定投資
-const FUN_INCOME_BASE = 45000; // 開源基準＝生活+投資（當月收入超過此，多的進水缸）
+const FUN_INVEST = 20000;      // 每月固定投資；節源基準＝每月預算(MONTHLY_BUDGET)、開源基準＝每月預算＋此，都跟著 Settings「每月預算」走
 let FUN_TARGET = 50000;        // 水缸目標金額；Settings 分頁「娛樂津貼目標」可覆蓋
 function expenseCatOptions() { return [...FIN.categories, [FUN_CAT, '🎟️ 娛樂津貼（不算預算）'], [LEND_CAT, '🤝 代墊（幫人墊，不算支出）']]; }
 
@@ -1969,8 +1967,8 @@ function computeFunAllowance(logData, expData){
     const rows=[]; let openTotal=0, saveTotal=0, usedTotal=0, bal=0;
     for(let ym=start, guard=0; ym<=cur&&guard<600; ym=ymAdd(ym,1), guard++){
         const inc=incByM[ym]||0, s=spent[ym]||0, u=used[ym]||0, closed=ym<cur;
-        const open=Math.max(0, inc-FUN_INCOME_BASE); // 開源：收入超過基準
-        const save=FUN_LIVING-s;                     // 節源：省下(正)／超支(負)
+        const open=Math.max(0, inc-(MONTHLY_BUDGET+FUN_INVEST)); // 開源：收入超過(每月預算＋投資)
+        const save=MONTHLY_BUDGET-s;                             // 節源：省下(正)／超支(負)，基準＝每月預算
         openTotal+=open; saveTotal+=save; usedTotal+=u;
         bal+=open+save-u;
         rows.push({ym, inc, spent:s, open, save, used:u, closed, bal});
@@ -2011,7 +2009,7 @@ function renderFunAllowance(logData, expData){
     body.innerHTML=rows.slice().reverse().map(r=>
         `<tr style="border-bottom:1px solid #eee;">`
         +`<td style="padding:7px 3px;white-space:nowrap;font-weight:bold;">${r.ym}${r.closed?'':`<span style="color:#8e24aa;">${sub('進行中')}</span>`}</td>`
-        +`<td style="${td}${r.spent>FUN_LIVING?'color:#e53935;':''}">${money(r.spent)}</td>`
+        +`<td style="${td}${r.spent>MONTHLY_BUDGET?'color:#e53935;':''}">${money(r.spent)}</td>`
         +`<td style="${td}">${openCell(r.open)}</td>`
         +`<td style="${td}">${saveCell(r.save)}</td>`
         +`<td style="${td}">${r.used?`<span style="color:#e91e63;">-${money(r.used)}</span>`:'<span style="color:#aaa;">—</span>'}</td>`
