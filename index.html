@@ -332,7 +332,7 @@
                     <tbody id="funTableBody"><tr><td colspan="6" style="color:#888;padding:8px;">計算中...</td></tr></tbody>
                 </table>
             </div>
-            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">規則：水缸每月累積兩種水——🔵 開源＝當月總收入超過「每月預算＋投資 20,000」的部分；🟢 節源＝當月花費低於「每月預算」省下的部分（超支則倒扣）。要花這筆錢時，記帳類別選「🎟️ 娛樂津貼」，會從水缸扣、不算進當月花費。基準跟著 Settings「每月預算」走；水缸容量設「娛樂津貼目標」、起算月設「娛樂津貼起算」。目前從 2026/10 起算。</div>
+            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">規則：水缸每月累積兩種水——🔵 開源＝當月總收入超過「每月預算＋每月投資」的部分；🟢 節源＝當月花費低於「每月預算」省下的部分（超支則倒扣）。要花這筆錢時，記帳類別選「🎟️ 娛樂津貼」，會從水缸扣、不算進當月花費。Settings 分頁可設「每月預算」「每月投資」(決定開源/節源基準)、「娛樂津貼目標」(水缸容量)、「娛樂津貼起算」。目前從 2026/10 起算。</div>
         </div>
 
         <div class="card">
@@ -649,7 +649,7 @@ const FUN_CAT = '娛樂津貼';
 const LEND_CAT = '代墊';          // 支出：幫別人墊錢，不算自己支出(帳戶照扣)
 const LEND_BACK_CAT = '代墊收回';  // 收入：對方還錢，不算自己收入(帳戶照加)
 let FUN_START = '2026/10'; // 起算月 yyyy/MM：預設從 2026/10 開始累積；Settings 分頁「娛樂津貼起算」可覆蓋
-const FUN_INVEST = 20000;      // 每月固定投資；節源基準＝每月預算(MONTHLY_BUDGET)、開源基準＝每月預算＋此，都跟著 Settings「每月預算」走
+let FUN_INVEST = 20000;        // 每月固定投資(開源基準＝每月預算＋此)；Settings 分頁「每月投資」可覆蓋
 let FUN_TARGET = 50000;        // 水缸目標金額；Settings 分頁「娛樂津貼目標」可覆蓋
 function expenseCatOptions() { return [...FIN.categories, [FUN_CAT, '🎟️ 娛樂津貼（不算預算）'], [LEND_CAT, '🤝 代墊（幫人墊，不算支出）']]; }
 
@@ -1281,6 +1281,7 @@ async function loadSettings() {
             if (!key || !val) return;
             if (/目標|桶金|goal/i.test(key))   SAVING_GOAL = val;
             if (/預算|budget/i.test(key))       MONTHLY_BUDGET = val;
+            if (/投資|投资/.test(key))          FUN_INVEST = val; // 例：每月投資｜20000
         });
     } catch (e) { /* 沒有 Settings 分頁，沿用預設值 */ }
 }
