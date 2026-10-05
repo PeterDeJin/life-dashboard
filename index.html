@@ -627,6 +627,9 @@ const OPTIONS = {
     incAccount:    ['華南銀行','郵局','富邦銀行','中國信託','錢包'], // 收入入帳帳戶（當沖/退手續費/股利預設富邦銀行＝股票交割戶）
 };
 
+// 現金資產帳戶：計入資產總額的現金帳戶（排除富邦證券＝持倉成本中轉、待付款）
+const CASH_ACCOUNTS = ['富邦銀行','郵局','華南銀行','中國信託','錢包','悠遊卡','icash','ipassmoney','學生證'];
+
 // ===== 娛樂津貼：記帳類別選它＝從娛樂津貼支出，不佔當月預算 =====
 const FUN_CAT = '娛樂津貼';
 const LEND_CAT = '代墊';          // 支出：幫別人墊錢，不算自己支出(帳戶照扣)
@@ -1712,6 +1715,16 @@ function loadAssetChart() {
             let dc=(pNow-pYest)*qty, showDc=dc!==0&&Math.abs(pNow-1)>0.01&&!isCash;
             if(!isCash&&qty>0&&pYest>1&&pNow>0) todayPnL+=dc; // 今日損益：排除現金與沒有有效昨收(=1 佔位)的列
             if(!isCash) holdRows.push({name, qty, mv, cost, dc, showDc, recShares:pos?pos.shares:0, color:palette[i%palette.length]}); // 持股明細只列投資部位(不含現金)
+        });
+
+        // 補上不在 Portfolio 的現金帳戶餘額(華南銀行、中國信託、錢包…)，比照現金列計入總額/圓餅/快照
+        const inPortfolio = new Set(portfolioData.map(r => String(r['項目名稱']||'').trim()));
+        CASH_ACCOUNTS.forEach((acc, j) => {
+            if (inPortfolio.has(acc)) return;             // 已在 Portfolio 以動態餘額算過，不重複
+            const mv = dyn[acc]||0; if (mv===0) return;
+            totalAssets += mv;
+            if (mv>0){ labels.push(acc); values.push(mv); colors.push(palette[(portfolioData.length+j)%palette.length]); }
+            globalSnapshotData.push({item:acc, qty:mv, mv, cost:mv});
         });
 
         renderHoldings(holdRows, investMV);
