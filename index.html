@@ -1504,7 +1504,7 @@ function sellCostOf(p, sh, day, commit) {
 
 // 手續費自動計算：成交金額 × 0.1425%，無條件捨去，套用最低手續費 FEE_MIN(預設 0＝無下限)
 function calcBrokerage(total) { return Math.max(FEE_MIN, Math.floor(total * 0.001425)); }
-function calcTax(total)       { return Math.round(total * 0.003); } // 證交稅 0.3%（賣出才有）
+function calcTax(total)       { return Math.floor(total * 0.003); } // 證交稅 0.3%（賣出才有），無條件捨去
 
 let _stPreviewTimer = null;
 function scheduleStockPreview(recalcFee = true) {
