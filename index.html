@@ -606,6 +606,7 @@ applyDarkMode();
 // ===== 可調設定（預設值；若 Google Sheet 有 Settings 分頁會被覆蓋）=====
 let SAVING_GOAL    = 1500000;  // 第一桶金目標
 let MONTHLY_BUDGET = 15000;    // 每月預算
+let FEE_MIN = 0;               // 最低手續費(預設 0＝無下限)；Settings「最低手續費」可設(如富邦電子下單 1 元)
 
 // ===== 帳戶 / 類別：單一設定來源（要新增帳戶只改這裡）=====
 const FIN = {
@@ -1277,6 +1278,7 @@ async function loadSettings() {
             const valRaw = (r.數值 !== undefined) ? r.數值 : (r.值 !== undefined ? r.值 : r.value);
             if (/娛樂/.test(key) && /起算|開始|起始/.test(key)) { const ym = ymOf(valRaw); if (ym) FUN_START = ym; return; } // 例：娛樂津貼起算｜2026/09
             if (/娛樂/.test(key) && /目標/.test(key)) { const v = n(valRaw); if (v > 0) FUN_TARGET = v; return; } // 例：娛樂津貼目標｜50000（要先於下面的通用「目標」判斷）
+            if (/最低/.test(key) && /費/.test(key)) { FEE_MIN = Math.max(0, n(valRaw)); return; } // 例：最低手續費｜1（可設 0）
             const val = n(valRaw);
             if (!key || !val) return;
             if (/目標|桶金|goal/i.test(key))   SAVING_GOAL = val;
@@ -1500,8 +1502,8 @@ function sellCostOf(p, sh, day, commit) {
     return cost;
 }
 
-// 手續費自動計算（標準 0.1425%，最低 $20）
-function calcBrokerage(total) { return Math.max(20, Math.ceil(total * 0.001425)); }
+// 手續費自動計算：成交金額 × 0.1425%，無條件捨去，套用最低手續費 FEE_MIN(預設 0＝無下限)
+function calcBrokerage(total) { return Math.max(FEE_MIN, Math.floor(total * 0.001425)); }
 function calcTax(total)       { return Math.round(total * 0.003); } // 證交稅 0.3%（賣出才有）
 
 let _stPreviewTimer = null;
