@@ -205,6 +205,12 @@
             <h2>📈 心情曲線</h2>
             <div style="height:240px;"><canvas id="moodChart"></canvas></div>
         </div>
+
+        <div class="card full-width">
+            <h2>🔗 數據洞察</h2>
+            <div style="font-size:0.8em;color:#999;margin-bottom:10px;">把心情、花費、習慣交叉分析，找出你自己的模式（需要同一天有紀錄才會出現）。</div>
+            <div id="insightsContainer" style="font-size:0.9em;">計算中...</div>
+        </div>
       </div>
     </div>
 
@@ -961,6 +967,47 @@ function loadMood(){
     }).catch(()=>{});
 }
 
+// ========== 數據洞察：心情 × 花費 × 習慣 交叉分析 ==========
+function loadInsights(){
+    const box=document.getElementById('insightsContainer'); if(!box) return;
+    Promise.all([fetchTab('Mood_DB'), fetchTab('Expenses_DB'), fetchTab('Habit_Log')]).then(([mood, exp, habit])=>{
+        const spendByDay={}, moodByDay={}, habitByDay={};
+        (Array.isArray(exp)?exp:[]).forEach(r=>{ if(r.收支!=='支出') return; const c=String(fCategory(r)).trim(); if(c===LEND_CAT) return; const d=formatDate(r.日期); if(d) spendByDay[d]=(spendByDay[d]||0)+n(r.金額); });
+        (Array.isArray(mood)?mood:[]).forEach(r=>{ const m=Number(r.心情||r.分數||0); const d=formatDate(r.日期); if(d&&m>=1&&m<=5) moodByDay[d]=m; });
+        (Array.isArray(habit)?habit:[]).forEach(r=>{ const d=formatDate(r.日期); if(d) habitByDay[d]={ ex:_isDone(r.運動習慣||r.運動), rd:_isDone(r.讀書習慣||r.讀書), en:_isDone(r.英文), sl:_isDone(r.睡覺習慣||r.睡覺) }; });
+        const avg=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:0, R=x=>Math.round(x).toLocaleString();
+        const bar=(label,val,max,txt)=>`<div style="display:flex;align-items:center;gap:8px;margin:3px 0;"><span style="width:40px;text-align:right;font-size:0.85em;">${label}</span><div style="flex:1;background:#f0f0f0;border-radius:4px;height:18px;"><div style="width:${max>0?Math.round(val/max*100):0}%;background:#7F77DD;height:100%;border-radius:4px;"></div></div><span style="width:92px;font-size:0.8em;color:#555;">${txt}</span></div>`;
+        const section=(title,bars,concl)=>`<div style="margin-bottom:16px;"><div style="font-weight:bold;color:#333;margin-bottom:6px;">${title}</div>${bars}${concl?`<div style="margin-top:6px;font-size:0.85em;color:#5b4fd6;background:#f6f5fe;padding:6px 10px;border-radius:6px;">💡 ${concl}</div>`:''}</div>`;
+        let html='';
+        // 1) 心情 × 當日花費
+        const bm={1:[],2:[],3:[],4:[],5:[]};
+        Object.keys(moodByDay).forEach(d=>{ if(spendByDay[d]!=null) bm[moodByDay[d]].push(spendByDay[d]); });
+        const mv=[1,2,3,4,5].map(m=>({m,n:bm[m].length,a:avg(bm[m])})).filter(x=>x.n>0);
+        if(mv.length>=2){
+            const mx=Math.max(...mv.map(x=>x.a)), wavg=g=>{let t=0,c=0;g.forEach(x=>{t+=x.a*x.n;c+=x.n;});return c?t/c:0;};
+            const lo=wavg(mv.filter(x=>x.m<=2)), hi=wavg(mv.filter(x=>x.m>=4));
+            const concl=(lo&&hi)?(lo>hi*1.1?`心情差的日子平均花 $${R(lo)}，比心情好的($${R(hi)})多——可能有情緒性消費。`:hi>lo*1.1?`心情好的日子花比較多（$${R(hi)} vs $${R(lo)}），開心就想犒賞自己？`:`心情好壞對花費影響不大。`):'';
+            html+=section('心情 vs 當日花費', mv.map(x=>bar(MOOD_EMOJI[x.m], x.a, mx, `$${R(x.a)}·${x.n}天`)).join(''), concl);
+        }
+        // 2) 習慣 × 心情
+        const rows=[];
+        [['ex','運動'],['rd','讀書'],['en','英文'],['sl','早睡']].forEach(([k,label])=>{
+            const w=[],wo=[]; Object.keys(moodByDay).forEach(d=>{ const h=habitByDay[d]; if(!h) return; (h[k]?w:wo).push(moodByDay[d]); });
+            if(w.length>=2&&wo.length>=2) rows.push({label,w:avg(w),wo:avg(wo)});
+        });
+        if(rows.length) html+=section('習慣 vs 心情（分數越高越好）', rows.map(r=>`<div style="margin:4px 0;">${r.label}：有做 <b style="color:#ec407a;">${r.w.toFixed(1)}</b> ・ 沒做 <b style="color:#999;">${r.wo.toFixed(1)}</b> ${r.w>r.wo+0.2?'<span style="color:#4caf50;">↑ 有做心情較好</span>':r.wo>r.w+0.2?'<span style="color:#999;">沒做反而較好</span>':'<span style="color:#aaa;">差不多</span>'}</div>`).join(''), '');
+        // 3) 星期 × 平均花費
+        const WD=['日','一','二','三','四','五','六'], bw={}; WD.forEach((_,i)=>bw[i]=[]);
+        Object.keys(spendByDay).forEach(d=>{ const dt=new Date(d.replace(/\//g,'-')); if(!isNaN(dt)) bw[dt.getDay()].push(spendByDay[d]); });
+        const wv=WD.map((w,i)=>({w,a:avg(bw[i]),n:bw[i].length})).filter(x=>x.n>0);
+        if(wv.length>=3){
+            const mx=Math.max(...wv.map(x=>x.a)), hi=wv.reduce((a,b)=>b.a>a.a?b:a), lo=wv.reduce((a,b)=>b.a<a.a?b:a);
+            html+=section('星期 vs 平均花費', wv.map(x=>bar('週'+x.w, x.a, mx, `$${R(x.a)}`)).join(''), `你週${hi.w}最會花（$${R(hi.a)}），週${lo.w}最省（$${R(lo.a)}）。`);
+        }
+        box.innerHTML = html || '<div style="color:#aaa;">資料還不夠——需要同一天同時有心情、記帳或習慣的紀錄，多記幾天就會出現洞察。</div>';
+    }).catch(()=>{ box.innerHTML='<div style="color:#ccc;">讀取失敗</div>'; });
+}
+
 // ========== 行事曆 ==========
 let calYear, calMonth, calSelected=null, calTodoMap={}, calEvents=[], calRecs=[];
 function calKey(y,m,d){ return y+'/'+String(m+1).padStart(2,'0')+'/'+String(d).padStart(2,'0'); }
@@ -1381,6 +1428,7 @@ window.onload = async function() {
     loadRecurring();
     loadTodos();
     loadMood();
+    loadInsights();
     loadCalendar();
     loadWatchlist();
     loadRestaurants();
