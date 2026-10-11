@@ -214,6 +214,12 @@
     <div id="view-insights" class="view-section">
       <div class="stack">
         <div class="card full-width">
+            <h2>🔮 現金流預測</h2>
+            <div style="font-size:0.8em;color:#999;margin-bottom:10px;">依現金餘額、固定支出扣款日、近 6 個月平均薪資與日常花費，推估未來 90 天的現金走勢（不含投資盈虧）。</div>
+            <div style="height:220px;"><canvas id="forecastChart"></canvas></div>
+            <div id="forecastContainer" style="font-size:0.88em;margin-top:10px;">計算中...</div>
+        </div>
+        <div class="card full-width">
             <h2>🔗 數據洞察</h2>
             <div style="font-size:0.8em;color:#999;margin-bottom:10px;">把心情、花費、習慣交叉分析，找出你自己的模式。已排除房租、手機費等固定支出（以 Recurring_DB 為準），只看會變動的生活花費。</div>
             <div id="insightsContainer" style="font-size:0.9em;">計算中...</div>
@@ -719,7 +725,7 @@ function collectIncome(logData, expData) {
 Chart.register(ChartDataLabels);
 Chart.defaults.set('plugins.datalabels', { display: false });
 
-let myChart=null, assetChart=null, incomeChart=null, compareChart=null, trendChart=null, moodChart=null, vsChart=null;
+let myChart=null, assetChart=null, incomeChart=null, compareChart=null, trendChart=null, moodChart=null, vsChart=null, forecastChart=null;
 let globalSnapshotData=[], globalTotalAssets=0, globalLivingFunds=0, globalExpensesData=[], globalIncomeRecs=[];
 let expShowCount=20; // 記帳列表目前顯示筆數（「載入更多」會增加）
 let editingExpenseId=null; // 記帳編輯模式：非 null 表示正在編輯該筆 ID
@@ -1016,6 +1022,49 @@ function loadInsights(){
             html+=section('星期 vs 平均花費', wv.map(x=>bar('週'+x.w, x.a, mx, `$${R(x.a)}`)).join(''), `你週${hi.w}最會花（$${R(hi.a)}），週${lo.w}最省（$${R(lo.a)}）。`);
         }
         box.innerHTML = html || '<div style="color:#aaa;">資料還不夠——需要同一天同時有心情、記帳或習慣的紀錄，多記幾天就會出現洞察。</div>';
+    }).catch(()=>{ box.innerHTML='<div style="color:#ccc;">讀取失敗</div>'; });
+}
+
+// ========== 現金流預測：未來 90 天現金餘額走勢 ==========
+function loadCashflowForecast(){
+    const box=document.getElementById('forecastContainer'), ctx=document.getElementById('forecastChart'); if(!box||!ctx) return;
+    Promise.all([fetchTab('Asset_Log'), fetchTab('Expenses_DB'), fetchTab('Recurring_DB')]).then(([log, exp, recur])=>{
+        // 現金起點：所有現金帳戶動態餘額
+        const dyn={};
+        (Array.isArray(log)?log:[]).forEach(r=>{ const a=String(r.帳戶||''); if(a) dyn[a]=(dyn[a]||0)+n(r.金額); });
+        (Array.isArray(exp)?exp:[]).forEach(r=>{ const a=String(r.帳戶||''); if(a){ const amt=n(r.金額); dyn[a]=(dyn[a]||0)+(r.收支==='支出'?-amt:amt); } });
+        let cash=0; CASH_ACCOUNTS.forEach(a=>cash+=dyn[a]||0);
+        // 近 6 月：月均薪資(可預期收入)、月均變動支出(排除固定)
+        const FIXED_RE=/房租|租金|手機|電話|話費|網路|寬頻|水費|電費|瓦斯|保險|月費|年費|訂閱|第四台|會費|分期/, SAL_RE=/薪|工讀|獎金|監考|家教|助教|打工/;
+        const salM={}, vsM={};
+        (Array.isArray(exp)?exp:[]).forEach(r=>{ const k=ymOf(r.日期); if(!k) return; const c=String(fCategory(r)).trim(), it=String(fItem(r)).trim(); if(r.收支==='支出'&&c!==LEND_CAT&&!FIXED_RE.test(c+it)) vsM[k]=(vsM[k]||0)+n(r.金額); if(r.收支==='收入'&&SAL_RE.test(c+it)) salM[k]=(salM[k]||0)+n(r.金額); });
+        (Array.isArray(log)?log:[]).forEach(r=>{ const k=ymOf(r.日期); if(!k) return; if(SAL_RE.test(String(fItem(r)).trim())) salM[k]=(salM[k]||0)+n(r.金額); });
+        const avg6=o=>{ const ks=Object.keys(o).sort().slice(-6); return ks.length?ks.reduce((s,k)=>s+o[k],0)/ks.length:0; };
+        const mSal=avg6(salM), mVs=avg6(vsM), daySal=mSal/30, dayVs=mVs/30;
+        // 啟用的固定支出
+        const fixed=(Array.isArray(recur)?recur:[]).filter(r=>_isDone(r.啟用!==undefined?r.啟用:'TRUE')).map(r=>({amt:n(r.金額), day:Number(r.扣款日||r['每月幾號'])||1}));
+        const mFix=fixed.reduce((s,f)=>s+f.amt,0);
+        // 模擬未來 90 天
+        const DAYS=90, t0=new Date(); t0.setHours(0,0,0,0);
+        const labels=[], data=[]; let bal=cash, minBal=cash, minD=new Date(t0), firstNeg=null;
+        for(let i=0;i<=DAYS;i++){
+            const d=new Date(t0); d.setDate(d.getDate()+i);
+            if(i>0){
+                bal += daySal - dayVs;
+                const last=new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+                fixed.forEach(f=>{ if(d.getDate()===Math.min(f.day,last)) bal-=f.amt; });
+            }
+            labels.push((d.getMonth()+1)+'/'+d.getDate()); data.push(Math.round(bal));
+            if(bal<minBal){ minBal=bal; minD=new Date(d); }
+            if(firstNeg===null && bal<0) firstNeg=new Date(d);
+        }
+        if(forecastChart) forecastChart.destroy();
+        forecastChart=new Chart(ctx,{type:'line',data:{labels,datasets:[{label:'預估現金餘額',data,borderColor:'#2a78d6',backgroundColor:'rgba(42,120,214,0.1)',fill:true,tension:0.1,pointRadius:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'$'+c.parsed.y.toLocaleString()}}},scales:{y:{ticks:{callback:v=>'$'+Math.round(v/1000)+'k'}},x:{ticks:{maxTicksLimit:8,autoSkip:true}}}}});
+        const monthNet=(daySal-dayVs)*30-mFix;
+        box.innerHTML=`現在現金 <b>${money(cash)}</b>・每月約${monthNet>=0?'結餘':'淨流出'} <b style="color:${monthNet>=0?'#4caf50':'#e53935'};">${money(Math.abs(monthNet))}</b>`
+            + `<br>90 天最低點：<b style="color:${minBal<0?'#e53935':'#333'};">${money(minBal)}</b>（${(minD.getMonth()+1)}/${minD.getDate()}）`
+            + (firstNeg?`<br><span style="color:#e53935;font-weight:bold;">⚠️ 預計 ${(firstNeg.getMonth()+1)}/${firstNeg.getDate()} 現金見底，記得提前補錢或賣股</span>`:'')
+            + `<div style="font-size:0.8em;color:#999;margin-top:6px;">假設：月薪資 ~${money(mSal)}、日常花費 ~${money(mVs)}、固定支出 ${money(mFix)}（按扣款日）；不含投資盈虧。薪資波動大時僅供趨勢參考。</div>`;
     }).catch(()=>{ box.innerHTML='<div style="color:#ccc;">讀取失敗</div>'; });
 }
 
@@ -1440,6 +1489,7 @@ window.onload = async function() {
     loadTodos();
     loadMood();
     loadInsights();
+    loadCashflowForecast();
     loadCalendar();
     loadWatchlist();
     loadRestaurants();
