@@ -114,6 +114,7 @@
     <button class="nav-item active" onclick="switchTab('home',this)"><span>🏠</span>首頁</button>
     <button class="nav-item" onclick="switchTab('expenses',this)"><span>💸</span>記帳</button>
     <button class="nav-item" onclick="switchTab('assets',this)"><span>💰</span>資產</button>
+    <button class="nav-item" onclick="switchTab('insights',this)"><span>🔍</span>洞察</button>
     <button class="nav-item" onclick="switchTab('more',this)"><span>🍔</span>更多</button>
 </nav>
 
@@ -206,9 +207,15 @@
             <div style="height:240px;"><canvas id="moodChart"></canvas></div>
         </div>
 
+      </div>
+    </div>
+
+    <!-- INSIGHTS -->
+    <div id="view-insights" class="view-section">
+      <div class="stack">
         <div class="card full-width">
             <h2>🔗 數據洞察</h2>
-            <div style="font-size:0.8em;color:#999;margin-bottom:10px;">把心情、花費、習慣交叉分析，找出你自己的模式（需要同一天有紀錄才會出現）。</div>
+            <div style="font-size:0.8em;color:#999;margin-bottom:10px;">把心情、花費、習慣交叉分析，找出你自己的模式。已排除房租、手機費等固定支出（以 Recurring_DB 為準），只看會變動的生活花費。</div>
             <div id="insightsContainer" style="font-size:0.9em;">計算中...</div>
         </div>
       </div>
@@ -970,9 +977,13 @@ function loadMood(){
 // ========== 數據洞察：心情 × 花費 × 習慣 交叉分析 ==========
 function loadInsights(){
     const box=document.getElementById('insightsContainer'); if(!box) return;
-    Promise.all([fetchTab('Mood_DB'), fetchTab('Expenses_DB'), fetchTab('Habit_Log')]).then(([mood, exp, habit])=>{
+    Promise.all([fetchTab('Mood_DB'), fetchTab('Expenses_DB'), fetchTab('Habit_Log'), fetchTab('Recurring_DB')]).then(([mood, exp, habit, recur])=>{
+        // 排除固定支出(房租/手機費等)：以 Recurring_DB 項目為準 + 關鍵字兜底，只看會變動的生活花費
+        const fixedNames=new Set((Array.isArray(recur)?recur:[]).map(r=>String(fItem(r)).trim()).filter(Boolean));
+        const FIXED_RE=/房租|租金|手機|電話|話費|網路|寬頻|水費|電費|瓦斯|保險|月費|年費|訂閱|第四台|會費|分期/;
+        const isFixed=(item,cat)=>fixedNames.has(item)||FIXED_RE.test(item)||FIXED_RE.test(cat);
         const spendByDay={}, moodByDay={}, habitByDay={};
-        (Array.isArray(exp)?exp:[]).forEach(r=>{ if(r.收支!=='支出') return; const c=String(fCategory(r)).trim(); if(c===LEND_CAT) return; const d=formatDate(r.日期); if(d) spendByDay[d]=(spendByDay[d]||0)+n(r.金額); });
+        (Array.isArray(exp)?exp:[]).forEach(r=>{ if(r.收支!=='支出') return; const c=String(fCategory(r)).trim(), it=String(fItem(r)).trim(); if(c===LEND_CAT||isFixed(it,c)) return; const d=formatDate(r.日期); if(d) spendByDay[d]=(spendByDay[d]||0)+n(r.金額); });
         (Array.isArray(mood)?mood:[]).forEach(r=>{ const m=Number(r.心情||r.分數||0); const d=formatDate(r.日期); if(d&&m>=1&&m<=5) moodByDay[d]=m; });
         (Array.isArray(habit)?habit:[]).forEach(r=>{ const d=formatDate(r.日期); if(d) habitByDay[d]={ ex:_isDone(r.運動習慣||r.運動), rd:_isDone(r.讀書習慣||r.讀書), en:_isDone(r.英文), sl:_isDone(r.睡覺習慣||r.睡覺) }; });
         const avg=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:0, R=x=>Math.round(x).toLocaleString();
