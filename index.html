@@ -231,6 +231,11 @@
             <div style="font-size:0.8em;color:#999;margin-bottom:10px;">把心情、花費、習慣交叉分析，找出你自己的模式。已排除房租、手機費等固定支出（以 Recurring_DB 為準），只看會變動的生活花費。</div>
             <div id="insightsContainer" style="font-size:0.9em;">計算中...</div>
         </div>
+
+        <div class="card full-width">
+            <h2>🏆 里程碑 & 連續紀錄</h2>
+            <div id="milestoneContainer" style="font-size:0.9em;">計算中...</div>
+        </div>
       </div>
     </div>
 
@@ -1114,6 +1119,33 @@ function loadHealthCheck(){
     }).catch(()=>{ box.innerHTML='<div style="color:#ccc;">讀取失敗</div>'; });
 }
 
+// ========== 里程碑 & 習慣連續天數 ==========
+function loadMilestones(){
+    const box=document.getElementById('milestoneContainer'); if(!box) return;
+    Promise.all([fetchTab('Asset_Log'), fetchTab('Expenses_DB'), fetchTab('Portfolio'), fetchTab('Habit_Log')]).then(([log, exp, port, habit])=>{
+        const dyn={};
+        (Array.isArray(log)?log:[]).forEach(r=>{ const a=String(r.帳戶||''); if(a) dyn[a]=(dyn[a]||0)+n(r.金額); });
+        (Array.isArray(exp)?exp:[]).forEach(r=>{ const a=String(r.帳戶||''); if(a){ const amt=n(r.金額); dyn[a]=(dyn[a]||0)+(r.收支==='支出'?-amt:amt); } });
+        let cash=0; CASH_ACCOUNTS.forEach(a=>cash+=dyn[a]||0);
+        let investMV=0; (Array.isArray(port)?port:[]).forEach(r=>{ const nm=String(r.項目名稱||''); if(/總金額|總資產|Beta|beta|郵局|銀行|現金|錢包|黃金/.test(nm)) return; investMV+=n(r.總市值); });
+        const net=cash+investMV;
+        const MILES=[500000,1000000,1500000,2000000,3000000,5000000];
+        const reached=MILES.filter(m=>net>=m), next=MILES.find(m=>net<m), goal=SAVING_GOAL||2000000;
+        const prog=(pct,c)=>`<div style="background:#eee;border-radius:5px;height:10px;overflow:hidden;margin:4px 0;"><div style="width:${Math.max(0,Math.min(100,pct))}%;height:100%;background:${c};"></div></div>`;
+        let html=`<div style="text-align:center;margin-bottom:10px;"><div style="font-size:0.85em;color:#888;">目前淨值</div><div style="font-size:1.8rem;font-weight:bold;color:#2a78d6;">${money(net)}</div></div>`;
+        if(next){ const prev=reached.length?reached[reached.length-1]:0; html+=`<div style="font-size:0.9em;">下一個里程碑 <b>${money(next)}</b>　還差 ${money(next-net)}</div>${prog((net-prev)/(next-prev)*100,'#2a78d6')}`; }
+        else html+=`<div style="font-size:0.9em;color:#4caf50;">🎉 已突破所有里程碑！</div>`;
+        html+=`<div style="font-size:0.9em;margin-top:8px;">🎯 第一桶金 ${money(goal)}　${Math.round(net/goal*100)}%</div>${prog(net/goal*100,'#4caf50')}`;
+        html+=`<div style="margin:10px 0;display:flex;flex-wrap:wrap;gap:6px;">`+MILES.map(m=>`<span style="font-size:0.8em;padding:3px 8px;border-radius:12px;${net>=m?'background:#e8f5e9;color:#2e7d32;':'background:#f0f0f0;color:#aaa;'}">${m/10000}萬${net>=m?' ✓':''}</span>`).join('')+`</div>`;
+        const rows=(Array.isArray(habit)?habit:[]).slice().sort((a,b)=>formatDate(a.日期)>formatDate(b.日期)?1:-1);
+        const cols=[['英文','英文'],['運動習慣','運動'],['讀書習慣','讀書'],['睡覺習慣','早睡']];
+        const streaks=cols.map(([col,label])=>{ let run=0,max=0; rows.forEach(r=>{ if(_isDone(r[col])){run++;if(run>max)max=run;}else run=0; }); let cur=0; for(let i=rows.length-1;i>=0;i--){ if(_isDone(rows[i][col]))cur++; else break; } return {label,cur,max}; });
+        html+=`<div style="border-top:1px solid #eee;margin-top:10px;padding-top:10px;"><div style="font-weight:bold;margin-bottom:6px;">🔥 習慣連續天數</div>`
+            + streaks.map(s=>`<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>${s.label}</span><span>目前 <b style="color:#ff6b35;">${s.cur}</b> 天・最長 ${s.max} 天</span></div>`).join('')+`</div>`;
+        box.innerHTML=html;
+    }).catch(()=>{ box.innerHTML='<div style="color:#ccc;">讀取失敗</div>'; });
+}
+
 // ========== 行事曆 ==========
 let calYear, calMonth, calSelected=null, calTodoMap={}, calEvents=[], calRecs=[];
 function calKey(y,m,d){ return y+'/'+String(m+1).padStart(2,'0')+'/'+String(d).padStart(2,'0'); }
@@ -1537,6 +1569,7 @@ window.onload = async function() {
     loadInsights();
     loadCashflowForecast();
     loadHealthCheck();
+    loadMilestones();
     loadCalendar();
     loadWatchlist();
     loadRestaurants();
