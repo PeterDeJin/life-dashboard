@@ -214,6 +214,13 @@
     <div id="view-insights" class="view-section">
       <div class="stack">
         <div class="card full-width">
+            <h2>🩺 財務健康體檢</h2>
+            <div class="grid-container">
+                <div style="height:260px;"><canvas id="healthChart"></canvas></div>
+                <div id="healthContainer" style="font-size:0.9em;align-self:center;">計算中...</div>
+            </div>
+        </div>
+        <div class="card full-width">
             <h2>🔮 現金流預測</h2>
             <div style="font-size:0.8em;color:#999;margin-bottom:10px;">依現金餘額、固定支出扣款日、近 6 個月平均薪資與日常花費，推估未來 90 天的現金走勢（不含投資盈虧）。</div>
             <div style="height:220px;"><canvas id="forecastChart"></canvas></div>
@@ -725,7 +732,7 @@ function collectIncome(logData, expData) {
 Chart.register(ChartDataLabels);
 Chart.defaults.set('plugins.datalabels', { display: false });
 
-let myChart=null, assetChart=null, incomeChart=null, compareChart=null, trendChart=null, moodChart=null, vsChart=null, forecastChart=null;
+let myChart=null, assetChart=null, incomeChart=null, compareChart=null, trendChart=null, moodChart=null, vsChart=null, forecastChart=null, healthChart=null;
 let globalSnapshotData=[], globalTotalAssets=0, globalLivingFunds=0, globalExpensesData=[], globalIncomeRecs=[];
 let expShowCount=20; // 記帳列表目前顯示筆數（「載入更多」會增加）
 let editingExpenseId=null; // 記帳編輯模式：非 null 表示正在編輯該筆 ID
@@ -1065,6 +1072,45 @@ function loadCashflowForecast(){
             + `<br>90 天最低點：<b style="color:${minBal<0?'#e53935':'#333'};">${money(minBal)}</b>（${(minD.getMonth()+1)}/${minD.getDate()}）`
             + (firstNeg?`<br><span style="color:#e53935;font-weight:bold;">⚠️ 預計 ${(firstNeg.getMonth()+1)}/${firstNeg.getDate()} 現金見底，記得提前補錢或賣股</span>`:'')
             + `<div style="font-size:0.8em;color:#999;margin-top:6px;">假設：月薪資 ~${money(mSal)}、日常花費 ~${money(mVs)}、固定支出 ${money(mFix)}（按扣款日）；不含投資盈虧。薪資波動大時僅供趨勢參考。</div>`;
+    }).catch(()=>{ box.innerHTML='<div style="color:#ccc;">讀取失敗</div>'; });
+}
+
+// ========== 財務健康體檢：5 維雷達圖 ==========
+function loadHealthCheck(){
+    const box=document.getElementById('healthContainer'), ctx=document.getElementById('healthChart'); if(!box||!ctx) return;
+    Promise.all([fetchTab('Asset_Log'), fetchTab('Expenses_DB'), fetchTab('Portfolio')]).then(([log, exp, port])=>{
+        const dyn={};
+        (Array.isArray(log)?log:[]).forEach(r=>{ const a=String(r.帳戶||''); if(a) dyn[a]=(dyn[a]||0)+n(r.金額); });
+        (Array.isArray(exp)?exp:[]).forEach(r=>{ const a=String(r.帳戶||''); if(a){ const amt=n(r.金額); dyn[a]=(dyn[a]||0)+(r.收支==='支出'?-amt:amt); } });
+        let cash=0; CASH_ACCOUNTS.forEach(a=>cash+=dyn[a]||0);
+        let investMV=0; (Array.isArray(port)?port:[]).forEach(r=>{ const nm=String(r.項目名稱||''); if(/總金額|總資產|Beta|beta|郵局|銀行|現金|錢包|黃金/.test(nm)) return; investMV+=n(r.總市值); });
+        const totalAsset=cash+investMV;
+        const recs=collectIncome(log, exp), incM={}, passM={};
+        recs.forEach(r=>{ incM[r.ym]=(incM[r.ym]||0)+r.amt; if(r.kind==='dividend'||r.kind==='interest') passM[r.ym]=(passM[r.ym]||0)+r.amt; });
+        const spendM={};
+        (Array.isArray(exp)?exp:[]).forEach(r=>{ if(r.收支!=='支出') return; const c=String(fCategory(r)).trim(); if(c===LEND_CAT) return; const k=ymOf(r.日期); if(k) spendM[k]=(spendM[k]||0)+n(r.金額); });
+        const cur=ymNow(), avg6=o=>{ const ks=Object.keys(o).sort().filter(k=>k<cur).slice(-6); return ks.length?ks.reduce((s,k)=>s+o[k],0)/ks.length:0; };
+        const mSpend=avg6(spendM), mPass=avg6(passM);
+        const curInc=incM[cur]||0, curSpend=spendM[cur]||0;
+        const savingRate=curInc>0?(curInc-curSpend)/curInc*100:0;
+        const months=mSpend>0?cash/mSpend:0, cover=mSpend>0?mPass/mSpend*100:0;
+        const over=Math.max(0,curSpend-MONTHLY_BUDGET), budget=Math.max(0,100-over/MONTHLY_BUDGET*100), invR=totalAsset>0?investMV/totalAsset*100:0;
+        const C=x=>Math.max(0,Math.min(100,x));
+        const dims=[
+            {k:'儲蓄率', s:C(savingRate/30*100), raw:`${Math.round(savingRate)}%`},
+            {k:'緊急備用金', s:C(months/6*100), raw:`${months.toFixed(1)}個月`},
+            {k:'被動收入', s:C(cover), raw:`覆蓋${Math.round(cover)}%`},
+            {k:'預算自律', s:C(budget), raw:over>0?`超支${money(over)}`:'未超支'},
+            {k:'資產活化', s:C(invR/70*100), raw:`投資${Math.round(invR)}%`},
+        ];
+        if(healthChart) healthChart.destroy();
+        healthChart=new Chart(ctx,{type:'radar',data:{labels:dims.map(d=>d.k),datasets:[{data:dims.map(d=>Math.round(d.s)),backgroundColor:'rgba(42,120,214,0.2)',borderColor:'#2a78d6',pointBackgroundColor:'#2a78d6'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{r:{min:0,max:100,ticks:{stepSize:25,display:false},pointLabels:{font:{size:12}}}}}});
+        const avgS=dims.reduce((s,d)=>s+d.s,0)/dims.length, weak=dims.slice().sort((a,b)=>a.s-b.s)[0];
+        const grade=avgS>=80?'很健康 💪':avgS>=60?'還不錯 🙂':avgS>=40?'普通 😐':'待加強 ⚠️';
+        const tips={'儲蓄率':'試著控制支出或增加收入。','緊急備用金':'建議留 3~6 個月生活費現金，別全壓投資。','被動收入':'可增加高股息資產，讓股利慢慢覆蓋生活開銷。','預算自律':'本月超支了，留意非必要消費。','資產活化':'現金太多閒置，可考慮投入讓錢增值。'};
+        box.innerHTML = `<div style="font-size:1.4rem;font-weight:bold;color:#2a78d6;">綜合 ${Math.round(avgS)} 分</div><div style="margin-bottom:8px;">${grade}</div>`
+            + dims.map(d=>`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f2f2f2;"><span>${d.k}</span><span style="color:#555;">${d.raw}・<b style="color:${d.s>=60?'#4caf50':d.s>=35?'#fb8c00':'#e53935'};">${Math.round(d.s)}</b></span></div>`).join('')
+            + `<div style="margin-top:8px;font-size:0.85em;color:#5b4fd6;background:#f6f5fe;padding:6px 10px;border-radius:6px;">💡 最弱是「${weak.k}」：${tips[weak.k]}</div>`;
     }).catch(()=>{ box.innerHTML='<div style="color:#ccc;">讀取失敗</div>'; });
 }
 
@@ -1490,6 +1536,7 @@ window.onload = async function() {
     loadMood();
     loadInsights();
     loadCashflowForecast();
+    loadHealthCheck();
     loadCalendar();
     loadWatchlist();
     loadRestaurants();
