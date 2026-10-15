@@ -656,6 +656,7 @@ const FIN = {
         { v:'富邦銀行' },
         { v:'富邦證券',   broker:true },
         { v:'待付款',     label:'⚠️ 待付款' },
+        { v:'台新信用卡', label:'💳 台新信用卡' }, // 信用卡：餘額為待還負債，不計入生活可用/資產總額
     ]
 };
 const LIVING_ACCOUNTS = FIN.accounts.filter(a => a.living).map(a => a.v);
@@ -664,12 +665,12 @@ function accLabel(v) { const a = FIN.accounts.find(x => x.v === v); return (a &&
 
 // 各下拉選單的選項（值統一參照上面的帳戶名）
 const OPTIONS = {
-    expAccount:    ['錢包','中國信託','華南銀行','悠遊卡','icash','ipassmoney','學生證','郵局','待付款'],
+    expAccount:    ['錢包','中國信託','華南銀行','悠遊卡','icash','ipassmoney','學生證','郵局','待付款','台新信用卡'],
     transFrom:     ['郵局','富邦銀行','中國信託','華南銀行','錢包'],
-    transTo:       ['錢包','悠遊卡','icash','ipassmoney','學生證','待付款','富邦證券','中國信託','郵局','富邦銀行','華南銀行'],
+    transTo:       ['錢包','悠遊卡','icash','ipassmoney','學生證','待付款','富邦證券','中國信託','郵局','富邦銀行','華南銀行','台新信用卡'],
     assetAccount:  ['富邦證券','郵局','富邦銀行','華南銀行'],
     assetCategory: ['股票','現金','加密貨幣'],
-    filterAccounts:['錢包','中國信託','華南銀行','學生證','郵局','富邦銀行','悠遊卡','icash','ipassmoney','待付款'],
+    filterAccounts:['錢包','中國信託','華南銀行','學生證','郵局','富邦銀行','悠遊卡','icash','ipassmoney','待付款','台新信用卡'],
     incAccount:    ['華南銀行','郵局','富邦銀行','中國信託','錢包'], // 收入入帳帳戶（當沖/退手續費/股利預設富邦銀行＝股票交割戶）
 };
 
