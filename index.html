@@ -144,7 +144,7 @@
                 <input type="text" id="evtTitle" placeholder="名稱" style="padding:8px;border-radius:5px;border:none;">
                 <input type="text" id="evtDate" placeholder="開始日期 (YYYY-MM-DD)" style="padding:8px;border-radius:5px;border:none;">
                 <input type="text" id="evtDateEnd" placeholder="結束日期 (選填，跨天才填)" style="padding:8px;border-radius:5px;border:none;">
-                <select id="evtType" style="padding:8px;border-radius:5px;border:none;"><option value="fixed">一次性</option><option value="yearly">每年重複</option></select>
+                <select id="evtType" style="padding:8px;border-radius:5px;border:none;"><option value="fixed">一次性</option><option value="monthly">每月重複</option><option value="yearly">每年重複</option></select>
                 <button onclick="submitEvent(this)" style="background:#4ca1af;color:white;">新增</button>
             </div>
             <div id="timeContainer" style="display:flex;flex-direction:column;gap:15px;">載入中...</div>
@@ -654,6 +654,7 @@ const FIN = {
         { v:'一卡通',                         living:true, calcOnly:true }, // 只計入生活可用，不出現在表單
         { v:'郵局' },
         { v:'富邦銀行' },
+        { v:'台新銀行' }, // 專款：放錢進來、每月還信用卡
         { v:'富邦證券',   broker:true },
         { v:'待付款',     label:'⚠️ 待付款' },
         { v:'台新信用卡', label:'💳 台新信用卡' }, // 信用卡：餘額為待還負債，不計入生活可用/資產總額
@@ -666,16 +667,16 @@ function accLabel(v) { const a = FIN.accounts.find(x => x.v === v); return (a &&
 // 各下拉選單的選項（值統一參照上面的帳戶名）
 const OPTIONS = {
     expAccount:    ['錢包','中國信託','華南銀行','悠遊卡','icash','ipassmoney','學生證','郵局','待付款','台新信用卡'],
-    transFrom:     ['郵局','富邦銀行','中國信託','華南銀行','錢包'],
-    transTo:       ['錢包','悠遊卡','icash','ipassmoney','學生證','待付款','富邦證券','中國信託','郵局','富邦銀行','華南銀行','台新信用卡'],
+    transFrom:     ['郵局','富邦銀行','中國信託','華南銀行','錢包','台新銀行'],
+    transTo:       ['錢包','悠遊卡','icash','ipassmoney','學生證','待付款','富邦證券','中國信託','郵局','富邦銀行','華南銀行','台新銀行','台新信用卡'],
     assetAccount:  ['富邦證券','郵局','富邦銀行','華南銀行'],
     assetCategory: ['股票','現金','加密貨幣'],
-    filterAccounts:['錢包','中國信託','華南銀行','學生證','郵局','富邦銀行','悠遊卡','icash','ipassmoney','待付款','台新信用卡'],
+    filterAccounts:['錢包','中國信託','華南銀行','學生證','郵局','富邦銀行','悠遊卡','icash','ipassmoney','待付款','台新銀行','台新信用卡'],
     incAccount:    ['華南銀行','郵局','富邦銀行','中國信託','錢包'], // 收入入帳帳戶（當沖/退手續費/股利預設富邦銀行＝股票交割戶）
 };
 
 // 現金資產帳戶：計入資產總額的現金帳戶（排除富邦證券＝持倉成本中轉、待付款）
-const CASH_ACCOUNTS = ['富邦銀行','郵局','華南銀行','中國信託','錢包','悠遊卡','icash','ipassmoney','學生證'];
+const CASH_ACCOUNTS = ['富邦銀行','郵局','華南銀行','中國信託','錢包','悠遊卡','icash','ipassmoney','學生證','台新銀行'];
 
 // ===== 娛樂津貼：記帳類別選它＝從娛樂津貼支出，不佔當月預算 =====
 const FUN_CAT = '娛樂津貼';
@@ -1213,8 +1214,10 @@ function calItems(y,m,d){
     if(hol) arr.push({label:(hol.holiday?'🎌 ':'💼 ')+hol.name, color:hol.holiday?'#d32f2f':'#8d6e63'});
     arr=arr.concat(calTodoMap[calKey(y,m,d)]||[]);
     const cur=(y*100+(m+1))*100+d;
+    const lastDay=new Date(y,m+1,0).getDate();
     calEvents.forEach(e=>{
         if(e.start!=null){ if(cur>=e.start && cur<=e.end) arr.push({label:'📆 '+e.title+(cur===e.start?'（始）':cur===e.end?'（迄）':''),color:'#9c27b0'}); } // 跨天事件：區間內每天標記
+        else if(e.type==='monthly'){ if(Math.min(e.d,lastDay)===d) arr.push({label:'🔁 '+e.title,color:'#00897b'}); } // 每月重複：每月該號顯示(月底不足取當月最後一天)
         else if(e.m===m && e.d===d && (e.type==='yearly' || e.y===y)) arr.push({label:'🎯 '+e.title,color:'#9c27b0'});
     });
     const last=new Date(y,m+1,0).getDate();
@@ -2473,6 +2476,7 @@ function loadTimeWidget(){
             let rg=parseDateRange(date); if(!rg) return;
             let sd=new Date(rg.s.getFullYear(),rg.s.getMonth(),rg.s.getDate()), ed=new Date(rg.e.getFullYear(),rg.e.getMonth(),rg.e.getDate());
             if(type==="yearly"){sd.setFullYear(yr);if(sd<now) sd.setFullYear(yr+1);ed=sd;}
+            else if(type==="monthly"){ const day=rg.s.getDate(), mk=(yy,mo)=>new Date(yy,mo,Math.min(day,new Date(yy,mo+1,0).getDate())); sd=mk(now.getFullYear(),now.getMonth()); if(sd<now) sd=mk(now.getFullYear(),now.getMonth()+1); ed=sd; } // 每月重複：倒數到下一個該號
             let diff=Math.floor((sd-now)/86400000), multi=(rg.e>rg.s), inProg=(sd<=now&&now<=ed);
             if(ed<now&&type!=="yearly") return; // 整段都過了才隱藏
             let dayText,dayColor;
