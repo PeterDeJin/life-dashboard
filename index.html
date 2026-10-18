@@ -580,8 +580,26 @@
                 <button onclick="randomRestaurant()" style="background:#ff7043;color:white;font-size:0.9rem;padding:8px 14px;white-space:nowrap;">🎲 今天吃哪家</button>
                 <input type="text" id="restSearch" placeholder="搜尋店名/分類…" oninput="loadRestaurants()" style="flex:1;padding:8px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;">
             </div>
+            <div style="display:flex;gap:6px;margin-bottom:10px;">
+                <button class="rest-fbtn" onclick="setRestFilter('想吃',this)" style="flex:1;padding:6px;border-radius:8px;border:1px solid #ff7043;background:#ff7043;color:#fff;font-size:0.85rem;">想吃</button>
+                <button class="rest-fbtn" onclick="setRestFilter('吃過',this)" style="flex:1;padding:6px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#666;font-size:0.85rem;">吃過</button>
+                <button class="rest-fbtn" onclick="setRestFilter('全部',this)" style="flex:1;padding:6px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#666;font-size:0.85rem;">全部</button>
+            </div>
             <div id="restPick" style="display:none;margin-bottom:12px;padding:14px;border-radius:10px;background:#fff3e0;border:1px solid #ffcc80;text-align:center;"></div>
             <div id="restContainer" style="display:flex;flex-direction:column;gap:8px;">載入中...</div>
+            <div id="restReviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+                <div style="background:#fff;border-radius:12px;padding:20px;width:100%;max-width:360px;box-sizing:border-box;">
+                    <div id="rrName" style="font-weight:bold;font-size:1.1rem;margin-bottom:12px;color:#333;"></div>
+                    <label style="font-size:0.85em;color:#666;">評分</label>
+                    <select id="rrRating" style="width:100%;padding:9px;margin:4px 0 12px;border-radius:8px;border:1px solid #ddd;box-sizing:border-box;"><option value="">未評分</option><option value="5">⭐⭐⭐⭐⭐</option><option value="4">⭐⭐⭐⭐</option><option value="3">⭐⭐⭐</option><option value="2">⭐⭐</option><option value="1">⭐</option></select>
+                    <label style="font-size:0.85em;color:#666;">心得</label>
+                    <input type="text" id="rrNote" placeholder="好吃嗎？記一下" style="width:100%;padding:9px;margin:4px 0 14px;border-radius:8px;border:1px solid #ddd;box-sizing:border-box;">
+                    <div style="display:flex;gap:8px;">
+                        <button onclick="submitRestReview()" style="flex:1;background:#4caf50;color:#fff;padding:10px;">✓ 存成吃過</button>
+                        <button onclick="document.getElementById('restReviewModal').style.display='none'" style="flex:1;background:#eee;color:#333;padding:10px;">取消</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="card full-width" style="border-left:5px solid #26a69a;">
@@ -1381,14 +1399,20 @@ function loadRestaurants(){
     fetchTab('Restaurant_DB').then(data=>{
         if(!Array.isArray(data)||!data.length){c.innerHTML="<div style='color:#ccc;'>尚未設定（Sheet 開 Restaurant_DB：店名、分類、狀態、評分、心得、ID）</div>";return;}
         const se=document.getElementById('restSearch'), kw=((se&&se.value)||'').toLowerCase().trim();
-        let list=kw?data.filter(r=>((r.店名||r.名稱||'')+(r.分類||r.類型||r.地點||'')).toLowerCase().includes(kw)):data;
+        let list=data;
+        if(restFilter!=='全部') list=list.filter(r=>String(r.狀態||'想吃')===restFilter);
+        if(kw) list=list.filter(r=>((r.店名||r.名稱||'')+(r.分類||r.類型||r.地點||'')).toLowerCase().includes(kw));
         const total=list.length, LIMIT=40;
+        if(!total){ c.innerHTML='<div style="color:#bbb;text-align:center;padding:14px;">這個分類沒有店</div>'; return; }
         c.innerHTML=list.slice(0,LIMIT).map(r=>{
-            const id=esc(r.ID!==undefined?r.ID:''),name=esc(r.店名||r.名稱||''),cat=esc(r.分類||r.類型||r.地點||''),st=String(r.狀態||'想吃'),note=esc(r.心得||r.備註||''),done=st==='吃過';
+            const id=esc(r.ID!==undefined?r.ID:''),name=esc(r.店名||r.名稱||''),cat=esc(r.分類||r.類型||r.地點||''),st=String(r.狀態||'想吃'),rawNote=String(r.心得||r.備註||''),done=st==='吃過';
             const badge=`<span style="font-size:0.75em;padding:2px 7px;border-radius:10px;background:${done?'#e8f5e9':'#fff3e0'};color:${done?'#2e7d32':'#e65100'};">${st}</span>`;
-            const doneBtn=done?'':`<button class="rest-done" data-id="${id}" style="background:#4caf50;color:#fff;font-size:0.8em;padding:5px 10px;border-radius:5px;border:none;">✓ 吃過</button>`;
-            const noteHtml=note?(/^https?:/.test(note)?`<br><a href="${note}" target="_blank" style="font-size:0.8em;color:#2a78d6;text-decoration:none;">🗺️ 地圖</a>`:`<br><span style="font-size:0.85em;color:#999;">${note}</span>`):'';
-            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:#f8f9fa;border-radius:8px;"><div><span style="font-weight:bold;color:#333;">${name}</span> ${badge} <span style="color:#f39c12;">${_stars(r.評分)}</span>${cat?`<br><span style="font-size:0.82em;color:#888;">${cat}</span>`:''}${noteHtml}</div><div style="display:flex;gap:6px;flex:none;">${doneBtn}<button class="rest-del" data-id="${id}" style="background:#ffebee;color:#c62828;font-size:0.8em;padding:5px 8px;border-radius:5px;border:1px solid #ffcdd2;">🗑️</button></div></div>`;
+            const noteTxt=(rawNote&&!/^https?:/.test(rawNote))?esc(rawNote):'';
+            const mapBtn=`<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.店名||r.名稱||'')}" target="_blank" style="font-size:0.8em;color:#2a78d6;text-decoration:none;white-space:nowrap;">🗺️ 導航</a>`;
+            const reviewBtn=done
+                ? `<button class="rest-review" data-id="${id}" style="background:#fff3e0;color:#e65100;font-size:0.8em;padding:5px 9px;border-radius:5px;border:1px solid #ffe0b2;">✏️</button>`
+                : `<button class="rest-review" data-id="${id}" style="background:#4caf50;color:#fff;font-size:0.8em;padding:5px 10px;border-radius:5px;border:none;">✓ 吃過</button>`;
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:#f8f9fa;border-radius:8px;gap:8px;"><div style="min-width:0;"><span style="font-weight:bold;color:#333;">${name}</span> ${badge} <span style="color:#f39c12;">${_stars(r.評分)}</span>${cat?`<br><span style="font-size:0.82em;color:#888;">${cat}</span>`:''}${noteTxt?`<br><span style="font-size:0.85em;color:#999;">${noteTxt}</span>`:''}<br>${mapBtn}</div><div style="display:flex;gap:6px;flex:none;">${reviewBtn}<button class="rest-del" data-id="${id}" style="background:#ffebee;color:#c62828;font-size:0.8em;padding:5px 8px;border-radius:5px;border:1px solid #ffcdd2;">🗑️</button></div></div>`;
         }).join('')+(total>LIMIT?`<div style="text-align:center;color:#aaa;font-size:0.85em;padding:6px;">顯示前 ${LIMIT} 家 / 共 ${total} 家，用搜尋找特定店</div>`:'');
     }).catch(()=>{c.innerHTML="<div style='color:#ccc;'>讀取失敗</div>";});
 }
@@ -1404,7 +1428,28 @@ function randomRestaurant(){
         box.innerHTML=`<div style="font-size:0.8em;color:#e65100;">🎲 今天就吃這家！</div><div style="font-size:1.3rem;font-weight:bold;color:#333;margin:4px 0;">${name}</div>${cat?`<div style="font-size:0.85em;color:#888;">${cat}</div>`:''}<div style="margin-top:8px;">${map}<button onclick="randomRestaurant()" style="background:#ff7043;color:#fff;font-size:0.8em;padding:5px 14px;border-radius:5px;border:none;margin-left:10px;">換一家</button></div>`;
     });
 }
-function restMarkDone(id){ apiPost({action:'update',tab:'Restaurant_DB',id,status:'吃過'}).then(d=>{ if(d.includes('Updated')){toast('改成吃過了','success');invalidateCache('Restaurant_DB');loadRestaurants();} else toast('失敗：'+d,'error'); }).catch(()=>toast('連線錯誤','error')); }
+let restFilter='想吃';
+function setRestFilter(f, btn){ restFilter=f; document.querySelectorAll('.rest-fbtn').forEach(b=>{b.style.background='#fff';b.style.color='#666';b.style.borderColor='#ddd';}); if(btn){btn.style.background='#ff7043';btn.style.color='#fff';btn.style.borderColor='#ff7043';} loadRestaurants(); }
+let rrId=null;
+function openRestReview(id){
+    fetchTab('Restaurant_DB').then(data=>{
+        const r=(Array.isArray(data)?data:[]).find(x=>String(x.ID)===String(id)); if(!r) return;
+        rrId=id;
+        document.getElementById('rrName').innerText=r.店名||r.名稱||'';
+        document.getElementById('rrRating').value=r.評分||'';
+        const note=String(r.心得||r.備註||'');
+        document.getElementById('rrNote').value=/^https?:/.test(note)?'':note; // 匯入的網址不當心得預填
+        document.getElementById('restReviewModal').style.display='flex';
+    });
+}
+function submitRestReview(){
+    if(!rrId) return;
+    const rating=document.getElementById('rrRating').value, note=document.getElementById('rrNote').value.trim();
+    apiPost({action:'update',tab:'Restaurant_DB',id:rrId,status:'吃過',rating,note}).then(d=>{
+        if(d.includes('Updated')){ toast('✓ 已記錄','success'); document.getElementById('restReviewModal').style.display='none'; invalidateCache('Restaurant_DB'); loadRestaurants(); }
+        else toast('失敗：'+d,'error');
+    }).catch(()=>toast('連線錯誤','error'));
+}
 function deleteRest(id,btn){ btn.innerText='⏳';btn.disabled=true; apiPost({action:'delete',tab:'Restaurant_DB',id}).then(d=>{ if(d.includes('Deleted')){invalidateCache('Restaurant_DB');loadRestaurants();} else {toast('刪除失敗','error');btn.innerText='🗑️';btn.disabled=false;} }).catch(()=>{toast('連線錯誤','error');btn.innerText='🗑️';btn.disabled=false;}); }
 
 // ========== 旅遊足跡 ==========
@@ -1534,7 +1579,7 @@ function setupDelegation() {
     const watchC = document.getElementById('watchContainer');
     if (watchC) watchC.addEventListener('click', e => { const dn = e.target.closest('.watch-done'); if (dn) { watchDone(dn.dataset.id, dn.dataset.t, dn.dataset.n); return; } const dl = e.target.closest('.watch-del'); if (dl) deleteWatch(dl.dataset.id, dl); });
     const restC = document.getElementById('restContainer');
-    if (restC) restC.addEventListener('click', e => { const dn = e.target.closest('.rest-done'); if (dn) { restMarkDone(dn.dataset.id); return; } const dl = e.target.closest('.rest-del'); if (dl) deleteRest(dl.dataset.id, dl); });
+    if (restC) restC.addEventListener('click', e => { const rv = e.target.closest('.rest-review'); if (rv) { openRestReview(rv.dataset.id); return; } const dl = e.target.closest('.rest-del'); if (dl) deleteRest(dl.dataset.id, dl); });
     const travelC = document.getElementById('travelContainer');
     if (travelC) travelC.addEventListener('click', e => { const dn = e.target.closest('.travel-done'); if (dn) { travelMarkDone(dn.dataset.id); return; } const dl = e.target.closest('.travel-del'); if (dl) deleteTravel(dl.dataset.id, dl); });
     const incL = document.getElementById('incomeRecordList');
