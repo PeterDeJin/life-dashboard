@@ -570,7 +570,7 @@
             </div>
             <div id="restForm" class="asset-form" style="display:none;background:#fff1ec;padding:15px;border-radius:10px;margin-bottom:15px;">
                 <input type="text" id="restName" placeholder="店名">
-                <input type="text" id="restCat" placeholder="分類 / 地點（如：拉麵・台北）">
+                <select id="restCat"><option value="">選料理類型</option><option>拉麵</option><option>牛肉麵</option><option>麵食</option><option>咖哩</option><option>火鍋</option><option>燒肉</option><option>日式</option><option>早午餐</option><option>咖啡甜點</option><option>義式</option><option>飯食</option><option>泰式</option><option>蔬食</option><option>其他</option></select>
                 <select id="restStatus"><option value="想吃">想吃</option><option value="吃過">吃過</option></select>
                 <select id="restRating"><option value="">未評分</option><option value="5">⭐⭐⭐⭐⭐</option><option value="4">⭐⭐⭐⭐</option><option value="3">⭐⭐⭐</option><option value="2">⭐⭐</option><option value="1">⭐</option></select>
                 <input type="text" id="restNote" placeholder="心得">
@@ -585,11 +585,14 @@
                 <button class="rest-fbtn" onclick="setRestFilter('吃過',this)" style="flex:1;padding:6px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#666;font-size:0.85rem;">吃過</button>
                 <button class="rest-fbtn" onclick="setRestFilter('全部',this)" style="flex:1;padding:6px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#666;font-size:0.85rem;">全部</button>
             </div>
+            <select id="restCuisine" onchange="loadRestaurants()" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;margin-bottom:10px;"><option value="">🍴 全部料理</option><option>拉麵</option><option>牛肉麵</option><option>麵食</option><option>咖哩</option><option>火鍋</option><option>燒肉</option><option>日式</option><option>早午餐</option><option>咖啡甜點</option><option>義式</option><option>飯食</option><option>泰式</option><option>蔬食</option><option>其他</option></select>
             <div id="restPick" style="display:none;margin-bottom:12px;padding:14px;border-radius:10px;background:#fff3e0;border:1px solid #ffcc80;text-align:center;"></div>
             <div id="restContainer" style="display:flex;flex-direction:column;gap:8px;">載入中...</div>
             <div id="restReviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;align-items:center;justify-content:center;padding:20px;">
                 <div style="background:#fff;border-radius:12px;padding:20px;width:100%;max-width:360px;box-sizing:border-box;">
                     <div id="rrName" style="font-weight:bold;font-size:1.1rem;margin-bottom:12px;color:#333;"></div>
+                    <label style="font-size:0.85em;color:#666;">料理類型</label>
+                    <select id="rrCat" style="width:100%;padding:9px;margin:4px 0 12px;border-radius:8px;border:1px solid #ddd;box-sizing:border-box;"><option value="">選料理類型</option><option>拉麵</option><option>牛肉麵</option><option>麵食</option><option>咖哩</option><option>火鍋</option><option>燒肉</option><option>日式</option><option>早午餐</option><option>咖啡甜點</option><option>義式</option><option>飯食</option><option>泰式</option><option>蔬食</option><option>其他</option></select>
                     <label style="font-size:0.85em;color:#666;">評分</label>
                     <select id="rrRating" style="width:100%;padding:9px;margin:4px 0 12px;border-radius:8px;border:1px solid #ddd;box-sizing:border-box;"><option value="">未評分</option><option value="5">⭐⭐⭐⭐⭐</option><option value="4">⭐⭐⭐⭐</option><option value="3">⭐⭐⭐</option><option value="2">⭐⭐</option><option value="1">⭐</option></select>
                     <label style="font-size:0.85em;color:#666;">心得</label>
@@ -1401,6 +1404,8 @@ function loadRestaurants(){
         const se=document.getElementById('restSearch'), kw=((se&&se.value)||'').toLowerCase().trim();
         let list=data;
         if(restFilter!=='全部') list=list.filter(r=>String(r.狀態||'想吃')===restFilter);
+        const cui=document.getElementById('restCuisine'), cuiVal=(cui&&cui.value)||'';
+        if(cuiVal) list=list.filter(r=>String(r.分類||r.類型||r.地點||'')===cuiVal);
         if(kw) list=list.filter(r=>((r.店名||r.名稱||'')+(r.分類||r.類型||r.地點||'')).toLowerCase().includes(kw));
         const total=list.length, LIMIT=40;
         if(!total){ c.innerHTML='<div style="color:#bbb;text-align:center;padding:14px;">這個分類沒有店</div>'; return; }
@@ -1436,6 +1441,7 @@ function openRestReview(id){
         const r=(Array.isArray(data)?data:[]).find(x=>String(x.ID)===String(id)); if(!r) return;
         rrId=id;
         document.getElementById('rrName').innerText=r.店名||r.名稱||'';
+        document.getElementById('rrCat').value=r.分類||r.類型||r.地點||'';
         document.getElementById('rrRating').value=r.評分||'';
         const note=String(r.心得||r.備註||'');
         document.getElementById('rrNote').value=/^https?:/.test(note)?'':note; // 匯入的網址不當心得預填
@@ -1444,8 +1450,8 @@ function openRestReview(id){
 }
 function submitRestReview(){
     if(!rrId) return;
-    const rating=document.getElementById('rrRating').value, note=document.getElementById('rrNote').value.trim();
-    apiPost({action:'update',tab:'Restaurant_DB',id:rrId,status:'吃過',rating,note}).then(d=>{
+    const cat=document.getElementById('rrCat').value, rating=document.getElementById('rrRating').value, note=document.getElementById('rrNote').value.trim();
+    apiPost({action:'update',tab:'Restaurant_DB',id:rrId,status:'吃過',cat,rating,note}).then(d=>{
         if(d.includes('Updated')){ toast('✓ 已記錄','success'); document.getElementById('restReviewModal').style.display='none'; invalidateCache('Restaurant_DB'); loadRestaurants(); }
         else toast('失敗：'+d,'error');
     }).catch(()=>toast('連線錯誤','error'));
