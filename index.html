@@ -576,6 +576,11 @@
                 <input type="text" id="restNote" placeholder="心得">
                 <button onclick="submitRest(this)" style="background:#ff7043;color:white;">新增</button>
             </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+                <button onclick="randomRestaurant()" style="background:#ff7043;color:white;font-size:0.9rem;padding:8px 14px;white-space:nowrap;">🎲 今天吃哪家</button>
+                <input type="text" id="restSearch" placeholder="搜尋店名/分類…" oninput="loadRestaurants()" style="flex:1;padding:8px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;">
+            </div>
+            <div id="restPick" style="display:none;margin-bottom:12px;padding:14px;border-radius:10px;background:#fff3e0;border:1px solid #ffcc80;text-align:center;"></div>
             <div id="restContainer" style="display:flex;flex-direction:column;gap:8px;">載入中...</div>
         </div>
 
@@ -1375,13 +1380,29 @@ function loadRestaurants(){
     const c=document.getElementById('restContainer'); if(!c) return;
     fetchTab('Restaurant_DB').then(data=>{
         if(!Array.isArray(data)||!data.length){c.innerHTML="<div style='color:#ccc;'>尚未設定（Sheet 開 Restaurant_DB：店名、分類、狀態、評分、心得、ID）</div>";return;}
-        c.innerHTML=data.map(r=>{
+        const se=document.getElementById('restSearch'), kw=((se&&se.value)||'').toLowerCase().trim();
+        let list=kw?data.filter(r=>((r.店名||r.名稱||'')+(r.分類||r.類型||r.地點||'')).toLowerCase().includes(kw)):data;
+        const total=list.length, LIMIT=40;
+        c.innerHTML=list.slice(0,LIMIT).map(r=>{
             const id=esc(r.ID!==undefined?r.ID:''),name=esc(r.店名||r.名稱||''),cat=esc(r.分類||r.類型||r.地點||''),st=String(r.狀態||'想吃'),note=esc(r.心得||r.備註||''),done=st==='吃過';
             const badge=`<span style="font-size:0.75em;padding:2px 7px;border-radius:10px;background:${done?'#e8f5e9':'#fff3e0'};color:${done?'#2e7d32':'#e65100'};">${st}</span>`;
             const doneBtn=done?'':`<button class="rest-done" data-id="${id}" style="background:#4caf50;color:#fff;font-size:0.8em;padding:5px 10px;border-radius:5px;border:none;">✓ 吃過</button>`;
-            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:#f8f9fa;border-radius:8px;"><div><span style="font-weight:bold;color:#333;">${name}</span> ${badge} <span style="color:#f39c12;">${_stars(r.評分)}</span>${cat?`<br><span style="font-size:0.82em;color:#888;">${cat}</span>`:''}${note?`<br><span style="font-size:0.85em;color:#999;">${note}</span>`:''}</div><div style="display:flex;gap:6px;flex:none;">${doneBtn}<button class="rest-del" data-id="${id}" style="background:#ffebee;color:#c62828;font-size:0.8em;padding:5px 8px;border-radius:5px;border:1px solid #ffcdd2;">🗑️</button></div></div>`;
-        }).join('');
+            const noteHtml=note?(/^https?:/.test(note)?`<br><a href="${note}" target="_blank" style="font-size:0.8em;color:#2a78d6;text-decoration:none;">🗺️ 地圖</a>`:`<br><span style="font-size:0.85em;color:#999;">${note}</span>`):'';
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:#f8f9fa;border-radius:8px;"><div><span style="font-weight:bold;color:#333;">${name}</span> ${badge} <span style="color:#f39c12;">${_stars(r.評分)}</span>${cat?`<br><span style="font-size:0.82em;color:#888;">${cat}</span>`:''}${noteHtml}</div><div style="display:flex;gap:6px;flex:none;">${doneBtn}<button class="rest-del" data-id="${id}" style="background:#ffebee;color:#c62828;font-size:0.8em;padding:5px 8px;border-radius:5px;border:1px solid #ffcdd2;">🗑️</button></div></div>`;
+        }).join('')+(total>LIMIT?`<div style="text-align:center;color:#aaa;font-size:0.85em;padding:6px;">顯示前 ${LIMIT} 家 / 共 ${total} 家，用搜尋找特定店</div>`:'');
     }).catch(()=>{c.innerHTML="<div style='color:#ccc;'>讀取失敗</div>";});
+}
+function randomRestaurant(){
+    fetchTab('Restaurant_DB').then(data=>{
+        const want=(Array.isArray(data)?data:[]).filter(r=>String(r.狀態||'想吃')==='想吃' && String(r.店名||r.名稱||'').trim());
+        if(!want.length){ toast('還沒有想吃的店','info'); return; }
+        const r=want[Math.floor(Math.random()*want.length)];
+        const name=esc(r.店名||r.名稱||''), cat=esc(r.分類||r.類型||r.地點||''), note=esc(r.心得||r.備註||'');
+        const map=/^https?:/.test(note)?`<a href="${note}" target="_blank" style="color:#2a78d6;text-decoration:none;">🗺️ 開地圖導航</a>`:'';
+        const box=document.getElementById('restPick'); if(!box) return;
+        box.style.display='block';
+        box.innerHTML=`<div style="font-size:0.8em;color:#e65100;">🎲 今天就吃這家！</div><div style="font-size:1.3rem;font-weight:bold;color:#333;margin:4px 0;">${name}</div>${cat?`<div style="font-size:0.85em;color:#888;">${cat}</div>`:''}<div style="margin-top:8px;">${map}<button onclick="randomRestaurant()" style="background:#ff7043;color:#fff;font-size:0.8em;padding:5px 14px;border-radius:5px;border:none;margin-left:10px;">換一家</button></div>`;
+    });
 }
 function restMarkDone(id){ apiPost({action:'update',tab:'Restaurant_DB',id,status:'吃過'}).then(d=>{ if(d.includes('Updated')){toast('改成吃過了','success');invalidateCache('Restaurant_DB');loadRestaurants();} else toast('失敗：'+d,'error'); }).catch(()=>toast('連線錯誤','error')); }
 function deleteRest(id,btn){ btn.innerText='⏳';btn.disabled=true; apiPost({action:'delete',tab:'Restaurant_DB',id}).then(d=>{ if(d.includes('Deleted')){invalidateCache('Restaurant_DB');loadRestaurants();} else {toast('刪除失敗','error');btn.innerText='🗑️';btn.disabled=false;} }).catch(()=>{toast('連線錯誤','error');btn.innerText='🗑️';btn.disabled=false;}); }
