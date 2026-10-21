@@ -592,6 +592,7 @@
                 <select id="restAreaFilter" onchange="loadRestaurants()" style="flex:1;min-width:0;padding:8px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;"><option value="">📍 地區</option></select>
                 <select id="restSourceFilter" onchange="loadRestaurants()" style="flex:1;min-width:0;padding:8px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;"><option value="">🏷️ 來源</option></select>
             </div>
+            <div style="text-align:right;margin-bottom:8px;"><button onclick="openAreaBatch()" style="background:#eef;color:#3949ab;font-size:0.8rem;padding:5px 12px;border-radius:8px;border:1px solid #c5cae9;">📍 批次補地區</button></div>
             <div id="restPick" style="display:none;margin-bottom:12px;padding:14px;border-radius:10px;background:#fff3e0;border:1px solid #ffcc80;text-align:center;"></div>
             <div id="restContainer" style="display:flex;flex-direction:column;gap:8px;">載入中...</div>
             <div id="restReviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;align-items:center;justify-content:center;padding:20px;">
@@ -611,6 +612,22 @@
                         <button onclick="submitRestReview()" style="flex:1;background:#4caf50;color:#fff;padding:10px;">✓ 存成吃過</button>
                         <button onclick="document.getElementById('restReviewModal').style.display='none'" style="flex:1;background:#eee;color:#333;padding:10px;">取消</button>
                     </div>
+                </div>
+            </div>
+            <datalist id="twDistricts">
+                <option>中正區</option><option>大同區</option><option>中山區</option><option>松山區</option><option>大安區</option><option>萬華區</option><option>信義區</option><option>士林區</option><option>北投區</option><option>內湖區</option><option>南港區</option><option>文山區</option>
+                <option>板橋區</option><option>三重區</option><option>中和區</option><option>永和區</option><option>新莊區</option><option>新店區</option><option>土城區</option><option>蘆洲區</option><option>樹林區</option><option>汐止區</option><option>鶯歌區</option><option>三峽區</option><option>淡水區</option><option>瑞芳區</option><option>五股區</option><option>泰山區</option><option>林口區</option><option>深坑區</option><option>石碇區</option><option>坪林區</option><option>三芝區</option><option>石門區</option><option>八里區</option><option>平溪區</option><option>雙溪區</option><option>貢寮區</option><option>金山區</option><option>萬里區</option><option>烏來區</option>
+                <option>基隆市</option><option>桃園區</option><option>中壢區</option><option>其他</option>
+            </datalist>
+            <div id="restAreaBatchModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;align-items:center;justify-content:center;padding:16px;">
+                <div style="background:#fff;border-radius:12px;padding:16px;width:100%;max-width:420px;max-height:85vh;display:flex;flex-direction:column;box-sizing:border-box;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <div style="font-weight:bold;color:#333;">📍 批次補地區</div>
+                        <button onclick="closeAreaBatch()" style="background:#ff7043;color:#fff;padding:6px 14px;border-radius:6px;border:none;">完成</button>
+                    </div>
+                    <div style="font-size:0.78em;color:#999;margin-bottom:6px;">打字會跳出各區建議，按 Enter 自動存檔並跳下一家</div>
+                    <div id="abProgress" style="font-size:0.82em;color:#3949ab;margin-bottom:8px;"></div>
+                    <div id="abList" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;"></div>
                 </div>
             </div>
         </div>
@@ -1482,6 +1499,47 @@ function submitRestReview(){
     }).catch(()=>toast('連線錯誤','error'));
 }
 function deleteRest(id,btn){ btn.innerText='⏳';btn.disabled=true; apiPost({action:'delete',tab:'Restaurant_DB',id}).then(d=>{ if(d.includes('Deleted')){invalidateCache('Restaurant_DB');loadRestaurants();} else {toast('刪除失敗','error');btn.innerText='🗑️';btn.disabled=false;} }).catch(()=>{toast('連線錯誤','error');btn.innerText='🗑️';btn.disabled=false;}); }
+// ===== 批次補地區 =====
+let areaBatchData=[];
+function openAreaBatch(){
+    fetchTab('Restaurant_DB').then(data=>{
+        areaBatchData=(Array.isArray(data)?data:[]).filter(r=>String(r.店名||r.名稱||'').trim());
+        areaBatchData.sort((a,b)=>(String(a.地區||'').trim()?1:0)-(String(b.地區||'').trim()?1:0)); // 沒填的排前面
+        renderAreaBatch();
+        document.getElementById('restAreaBatchModal').style.display='flex';
+    });
+}
+function renderAreaBatch(){
+    const L=document.getElementById('abList'); if(!L) return;
+    L.innerHTML=areaBatchData.map(r=>{
+        const id=esc(String(r.ID!==undefined?r.ID:'')),name=esc(r.店名||r.名稱||''),area=esc(String(r.地區||'').trim());
+        return `<div style="display:flex;align-items:center;gap:8px;"><span style="flex:1;min-width:0;font-size:0.88em;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</span><input list="twDistricts" data-id="${id}" value="${area}" placeholder="行政區" style="width:116px;flex:none;padding:6px;border-radius:6px;border:1px solid #ddd;"><span class="ab-stat" style="width:14px;flex:none;font-size:0.9em;color:#4caf50;">${area?'✓':''}</span></div>`;
+    }).join('');
+    updateAbProgress();
+}
+function updateAbProgress(){
+    const el=document.getElementById('abProgress'); if(!el) return;
+    const filled=areaBatchData.filter(r=>String(r.地區||'').trim()).length;
+    el.innerText=`已填 ${filled} / ${areaBatchData.length} 家`;
+}
+function saveArea(inputEl){
+    const id=inputEl.dataset.id, val=inputEl.value.trim();
+    const rec=areaBatchData.find(r=>String(r.ID)===String(id));
+    if(rec && String(rec.地區||'').trim()===val) return; // 沒變就不送
+    const stat=inputEl.parentElement.querySelector('.ab-stat');
+    if(stat){stat.style.color='#999';stat.innerText='⏳';}
+    apiPost({action:'update',tab:'Restaurant_DB',id,area:val}).then(d=>{
+        if(d.includes('Updated')){
+            if(rec) rec.地區=val;
+            if(stat){stat.style.color='#4caf50';stat.innerText=val?'✓':'';}
+            updateAbProgress();
+        } else { if(stat){stat.style.color='#c62828';stat.innerText='✗';} }
+    }).catch(()=>{ if(stat){stat.style.color='#c62828';stat.innerText='✗';} });
+}
+function closeAreaBatch(){
+    document.getElementById('restAreaBatchModal').style.display='none';
+    invalidateCache('Restaurant_DB'); loadRestaurants();
+}
 
 // ========== 旅遊足跡 ==========
 function toggleTravelForm(){const f=document.getElementById('travelForm');f.style.display=f.style.display==='none'?'flex':'none';}
@@ -1611,6 +1669,17 @@ function setupDelegation() {
     if (watchC) watchC.addEventListener('click', e => { const dn = e.target.closest('.watch-done'); if (dn) { watchDone(dn.dataset.id, dn.dataset.t, dn.dataset.n); return; } const dl = e.target.closest('.watch-del'); if (dl) deleteWatch(dl.dataset.id, dl); });
     const restC = document.getElementById('restContainer');
     if (restC) restC.addEventListener('click', e => { const rv = e.target.closest('.rest-review'); if (rv) { openRestReview(rv.dataset.id); return; } const dl = e.target.closest('.rest-del'); if (dl) deleteRest(dl.dataset.id, dl); });
+    const abList = document.getElementById('abList');
+    if (abList) {
+        abList.addEventListener('change', e => { if (e.target.matches('input[data-id]')) saveArea(e.target); });
+        abList.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && e.target.matches('input[data-id]')) {
+                e.preventDefault(); saveArea(e.target);
+                const ins = [...abList.querySelectorAll('input[data-id]')]; const i = ins.indexOf(e.target);
+                if (i >= 0 && i + 1 < ins.length) ins[i + 1].focus();
+            }
+        });
+    }
     const travelC = document.getElementById('travelContainer');
     if (travelC) travelC.addEventListener('click', e => { const dn = e.target.closest('.travel-done'); if (dn) { travelMarkDone(dn.dataset.id); return; } const dl = e.target.closest('.travel-del'); if (dl) deleteTravel(dl.dataset.id, dl); });
     const incL = document.getElementById('incomeRecordList');
@@ -2568,6 +2637,7 @@ function loadTimeWidget(){
     let html=`<div><div style="display:flex;justify-content:space-between;font-size:0.9em;margin-bottom:5px;"><span>${yr}年 已過</span><span>${yPct.toFixed(1)}%</span></div><div style="width:100%;background:rgba(255,255,255,0.2);border-radius:10px;height:8px;"><div style="height:100%;background:#fff;width:${yPct}%;border-radius:10px;"></div></div></div>`;
     fetchTab('Events_DB').then(data=>{
         if(!data.length){container.innerHTML=html+"<div style='text-align:center;font-size:0.8em;opacity:0.7;margin-top:10px;'>尚無倒數事件</div>";return;}
+        const items=[];
         data.forEach(evt=>{
             let title=evt['事件名稱']||evt['title'], date=evt['日期']||evt['date'], type=String(evt['類型']||evt['type']||"fixed").toLowerCase().trim();
             let rg=parseDateRange(date); if(!rg) return;
@@ -2582,10 +2652,24 @@ function loadTimeWidget(){
             else if(diff>0){dayText=`${diff} <span style="font-size:0.6em;">天</span>`;dayColor="#ffeb3b";}
             else{dayText="已結束";dayColor="#ccc";}
             let dateLabel=multi?(formatDate(sd)+' ~ '+formatDate(ed)):formatDate(sd);
-            html+=`<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.1);padding:10px 15px;border-radius:10px;"><div><div style="font-size:0.85em;opacity:0.8;">${esc(title)}</div><div style="font-size:1.1em;font-weight:bold;">${dateLabel}</div></div><div style="text-align:right;"><div style="font-size:0.85em;opacity:0.8;">${inProg&&multi?"狀態":(diff===0?"Status":"還剩下")}</div><div style="font-size:1.5em;font-weight:bold;color:${dayColor};">${dayText}</div></div></div>`;
+            const sortKey=inProg?-1:(diff>=0?diff:1e6); // 進行中置頂，其餘由近到遠，已過沉底
+            items.push({sortKey,rowHtml:`<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.1);padding:10px 15px;border-radius:10px;"><div><div style="font-size:0.85em;opacity:0.8;">${esc(title)}</div><div style="font-size:1.1em;font-weight:bold;">${dateLabel}</div></div><div style="text-align:right;"><div style="font-size:0.85em;opacity:0.8;">${inProg&&multi?"狀態":(diff===0?"Status":"還剩下")}</div><div style="font-size:1.5em;font-weight:bold;color:${dayColor};">${dayText}</div></div></div>`});
         });
-        container.innerHTML=html;
+        items.sort((a,b)=>a.sortKey-b.sortKey);
+        const N=4;
+        let body=items.slice(0,N).map(it=>it.rowHtml).join('');
+        if(items.length>N){
+            const rest=items.slice(N).map(it=>it.rowHtml).join('');
+            body+=`<div style="text-align:center;"><button onclick="toggleCountdownRest(this)" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:8px 18px;border-radius:20px;font-size:0.85em;cursor:pointer;">▼ 顯示其餘 ${items.length-N} 個</button></div><div id="cdRest" style="display:none;flex-direction:column;gap:15px;">${rest}</div>`;
+        }
+        container.innerHTML=html+body;
     }).catch(()=>{container.innerHTML=html;});
+}
+function toggleCountdownRest(btn){
+    const r=document.getElementById('cdRest'); if(!r) return;
+    const open=r.style.display==='none';
+    r.style.display=open?'flex':'none';
+    btn.innerText=open?'▲ 收合':('▼ 顯示其餘 '+r.children.length+' 個');
 }
 
 // 功能 18：願望清單
