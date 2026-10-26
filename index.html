@@ -213,6 +213,13 @@
     <!-- INSIGHTS -->
     <div id="view-insights" class="view-section">
       <div class="stack">
+        <div class="card full-width" style="border-left:5px solid #7e57c2;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <h2 style="margin:0;">🎞️ 年度回顧</h2>
+                <span id="yrReviewTitle" style="font-size:0.8em;color:#999;"></span>
+            </div>
+            <div id="yearReviewContainer" style="margin-top:12px;">計算中...</div>
+        </div>
         <div class="card full-width">
             <h2>🩺 財務健康體檢</h2>
             <div class="grid-container">
@@ -1201,6 +1208,70 @@ function loadMilestones(){
     }).catch(()=>{ box.innerHTML='<div style="color:#ccc;">讀取失敗</div>'; });
 }
 
+// ========== 年度回顧（財務收支 + 投資績效）==========
+function loadYearReview(){
+    const box=document.getElementById('yearReviewContainer'); if(!box) return;
+    Promise.all([fetchTab('Expenses_DB'), fetchTab('Asset_Log'), fetchTab('History_Log')]).then(([exp, asset, hist])=>{
+        const YEAR=new Date().getFullYear(), yp=YEAR+'/';
+        const now=new Date(), yStart=new Date(YEAR,0,1), yEnd=new Date(YEAR+1,0,1);
+        const pct=((now-yStart)/(yEnd-yStart)*100);
+        const tEl=document.getElementById('yrReviewTitle'); if(tEl) tEl.innerText=`${YEAR} 年・已過 ${pct.toFixed(0)}%`;
+
+        // ---- 收入（沿用全站統一的 collectIncome / 分組規則）----
+        const incs=collectIncome(asset, exp).filter(r=>String(r.ym).startsWith(yp));
+        let totalIncome=0; const grpSum={};
+        incs.forEach(r=>{ totalIncome+=r.amt; const g=KIND_GRP[r.kind]||'other'; grpSum[g]=(grpSum[g]||0)+r.amt; });
+
+        // ---- 支出（收支=支出、排除代墊）----
+        const exps=(Array.isArray(exp)?exp:[]).filter(r=>r.收支==='支出' && String(fCategory(r)).trim()!==LEND_CAT && String(ymOf(r.日期)).startsWith(yp));
+        let totalExpense=0; const catSum={}; let biggest=null;
+        exps.forEach(r=>{ const a=n(r.金額); totalExpense+=a; const c=String(fCategory(r)).trim()||'其他'; catSum[c]=(catSum[c]||0)+a; if(!biggest||a>biggest.a) biggest={a,item:String(fItem(r)),date:formatDate(r.日期)}; });
+        const topCats=Object.entries(catSum).sort((a,b)=>b[1]-a[1]).slice(0,3), maxCat=topCats.length?topCats[0][1]:0;
+
+        if(!incs.length && !exps.length){ box.innerHTML=`<div style="color:#bbb;text-align:center;padding:10px;">${YEAR} 年還沒有收支紀錄</div>`; return; }
+
+        const net=totalIncome-totalExpense, savingRate=totalIncome>0?(net/totalIncome*100):0;
+
+        // ---- 投資實現損益：當沖(含退手續費) + 股票已實現 + 股利 ----
+        const invDay=grpSum['daytrade']||0, invStock=grpSum['stock']||0, invDiv=grpSum['dividend']||0, invTotal=invDay+invStock+invDiv;
+
+        // ---- 總資產淨值 & 年內變化（History_Log 的「總資產」快照）----
+        const snaps=(Array.isArray(hist)?hist:[]).filter(r=>String(r.資產名稱||'').trim()==='總資產' && String(ymOf(r.日期)).startsWith(yp) && n(r.現淨值)>0)
+            .map(r=>({ts:new Date(String(r.日期).replace(/\//g,'-').split('T')[0]+'T00:00:00').getTime(), val:n(r.現淨值), date:formatDate(r.日期)}))
+            .sort((a,b)=>a.ts-b.ts);
+        const curNet=(typeof globalTotalAssets==='number'&&globalTotalAssets>0)?globalTotalAssets:(snaps.length?snaps[snaps.length-1].val:0);
+        const netGrowth=snaps.length?(curNet-snaps[0].val):null;
+
+        // ---- 組字 ----
+        const tile=(label,val,color,sub)=>`<div style="flex:1;min-width:92px;background:#faf8ff;border-radius:10px;padding:10px 6px;text-align:center;"><div style="font-size:0.72em;color:#999;">${label}</div><div style="font-size:1.15rem;font-weight:bold;color:${color};">${val}</div>${sub?`<div style="font-size:0.72em;color:#aaa;margin-top:2px;">${sub}</div>`:''}</div>`;
+        const incChips=INCOME_GROUPS.filter(g=>grpSum[g.grp]).map(g=>`<span style="background:${g.color}1a;color:${g.color};font-size:0.8em;padding:3px 9px;border-radius:12px;white-space:nowrap;">${g.icon} ${g.label} ${money(grpSum[g.grp])}</span>`).join('');
+        const expRows=topCats.map(([c,a])=>{ const w=maxCat>0?Math.round(a/maxCat*100):0, emoji=CAT_EMOJI[c]||'🛒'; return `<div style="margin-bottom:6px;"><div style="display:flex;justify-content:space-between;font-size:0.85em;"><span>${emoji} ${esc(c)}</span><span style="font-weight:bold;">${money(a)}</span></div><div style="height:6px;background:#eee;border-radius:3px;overflow:hidden;"><div style="height:100%;width:${w}%;background:#ef7a85;"></div></div></div>`; }).join('');
+        const biggestHtml=biggest?`<div style="font-size:0.82em;color:#888;margin-top:8px;">最大單筆：<b style="color:#c62828;">${money(biggest.a)}</b> ${esc(biggest.item)} <span style="color:#bbb;">（${biggest.date}）</span></div>`:'';
+        const invColor=invTotal>=0?'#2e7d32':'#c62828';
+        const invChips=[['⚡ 當沖',invDay,'#eb6834'],['📈 股票',invStock,'#8e44ad'],['🌱 股利',invDiv,'#eda100']].filter(x=>x[1]).map(([lab,v,col])=>`<span style="background:${col}1a;color:${col};font-size:0.8em;padding:3px 9px;border-radius:12px;white-space:nowrap;">${lab} ${money(v,true)}</span>`).join('');
+        const nwSub=netGrowth!=null?(money(netGrowth,true)+' 年內'):'';
+
+        box.innerHTML=`
+<div style="font-weight:bold;color:#7e57c2;margin-bottom:8px;">💰 財務收支</div>
+<div style="display:flex;gap:8px;margin-bottom:12px;">
+  ${tile('總收入',money(totalIncome),'#2e7d32')}
+  ${tile('總支出',money(totalExpense),'#c62828')}
+  ${tile('結餘',money(net,true),net>=0?'#2a78d6':'#c62828','儲蓄率 '+savingRate.toFixed(0)+'%')}
+</div>
+${incChips?`<div style="font-size:0.78em;color:#999;margin-bottom:4px;">收入組成</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">${incChips}</div>`:''}
+${expRows?`<div style="font-size:0.78em;color:#999;margin-bottom:6px;">支出 Top 3（全年 ${exps.length} 筆）</div>${expRows}`:''}
+${biggestHtml}
+<div style="border-top:1px dashed #e0d7f0;margin:14px 0 12px;"></div>
+<div style="font-weight:bold;color:#7e57c2;margin-bottom:8px;">📈 投資績效</div>
+<div style="display:flex;gap:8px;margin-bottom:10px;">
+  ${tile('投資實現損益',money(invTotal,true),invColor)}
+  ${tile('目前總資產淨值',money(curNet),'#2a78d6',nwSub)}
+</div>
+${invChips?`<div style="display:flex;flex-wrap:wrap;gap:6px;">${invChips}</div>`:''}
+<div style="font-size:0.72em;color:#bbb;margin-top:10px;">投資實現損益＝當沖＋股票已實現＋股利；淨值變化含存入，非純報酬。</div>`;
+    }).catch(()=>{ box.innerHTML='<div style="color:#ccc;">讀取失敗</div>'; });
+}
+
 // ========== 行事曆 ==========
 let calYear, calMonth, calSelected=null, calTodoMap={}, calEvents=[], calRecs=[];
 function calKey(y,m,d){ return y+'/'+String(m+1).padStart(2,'0')+'/'+String(d).padStart(2,'0'); }
@@ -1740,6 +1811,7 @@ window.onload = async function() {
     loadCashflowForecast();
     loadHealthCheck();
     loadMilestones();
+    loadYearReview();
     loadCalendar();
     loadWatchlist();
     loadRestaurants();
