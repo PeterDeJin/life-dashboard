@@ -16,7 +16,8 @@
     <style>
         body { font-family: '微軟正黑體', sans-serif; background: #f4f7f6; padding: 15px; display: flex; flex-direction: column; align-items: center; -webkit-user-select: none; user-select: none; margin: 0; padding-bottom: 80px; }
         .container { max-width: 1200px; width: 100%; }
-        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 0; }
+        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 0; border-left: 5px solid #cbd5e1; }
+        .card[style*="gradient"] { border-left: none; } /* 漸層大數字卡不要色帶 */
         /* 卡片折疊：收起後只留標題列 */
         .card.collapsed > *:not(:first-child) { display: none !important; }
         .card.collapsed > *:first-child { margin-bottom: 0 !important; }
@@ -129,7 +130,7 @@
     <!-- HOME -->
     <div id="view-home" class="view-section active">
       <div class="stack">
-        <div class="card no-collapse">
+        <div class="card no-collapse" style="border-left:5px solid #00897b;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                 <button onclick="calShift(-1)" style="background:#eceff1;color:#555;box-shadow:none;padding:4px 14px;">◀</button>
                 <h2 id="calLabel" style="margin:0;font-size:1.1rem;">📅 行事曆</h2>
@@ -155,7 +156,7 @@
             <div id="timeContainer" style="display:flex;flex-direction:column;gap:15px;">載入中...</div>
         </div>
 
-        <div class="card check-in-box">
+        <div class="card check-in-box" style="border-left:5px solid #00acc1;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
                 <h2 style="margin:0;font-size:1.2rem;">📅 今天打卡</h2>
                 <input type="date" id="habitDate" style="border:1px solid #b2ebf2;padding:5px 10px;border-radius:8px;background:rgba(255,255,255,0.8);font-weight:bold;color:#00796b;width:auto;">
@@ -215,36 +216,36 @@
             </div>
             <div id="yearReviewContainer" style="margin-top:12px;">計算中...</div>
         </div>
-        <div class="card full-width">
+        <div class="card full-width" style="border-left:5px solid #ef5350;">
             <h2>🩺 財務健康體檢</h2>
             <div class="grid-container">
                 <div style="height:260px;"><canvas id="healthChart"></canvas></div>
                 <div id="healthContainer" style="font-size:0.9em;align-self:center;">計算中...</div>
             </div>
         </div>
-        <div class="card full-width">
+        <div class="card full-width" style="border-left:5px solid #42a5f5;">
             <h2>🔮 現金流預測</h2>
             <div style="font-size:0.8em;color:#999;margin-bottom:10px;">依現金餘額、固定支出扣款日、近 6 個月平均薪資與日常花費，推估未來 90 天的現金走勢（不含投資盈虧）。</div>
             <div style="height:220px;"><canvas id="forecastChart"></canvas></div>
             <div id="forecastContainer" style="font-size:0.88em;margin-top:10px;">計算中...</div>
         </div>
-        <div class="card full-width">
+        <div class="card full-width" style="border-left:5px solid #ab47bc;">
             <h2>🔗 數據洞察</h2>
             <div style="font-size:0.8em;color:#999;margin-bottom:10px;">把心情、花費、習慣交叉分析，找出你自己的模式。已排除房租、手機費等固定支出（以 Recurring_DB 為準），只看會變動的生活花費。</div>
             <div id="insightsContainer" style="font-size:0.9em;">計算中...</div>
         </div>
 
-        <div class="card full-width">
+        <div class="card full-width" style="border-left:5px solid #ffa726;">
             <h2>🏆 里程碑 & 連續紀錄</h2>
             <div id="milestoneContainer" style="font-size:0.9em;">計算中...</div>
         </div>
 
-        <div class="card">
+        <div class="card" style="border-left:5px solid #66bb6a;">
             <h2>📈 能力成長曲線</h2>
             <canvas id="habitChart"></canvas>
         </div>
 
-        <div class="card">
+        <div class="card" style="border-left:5px solid #d81b60;">
             <h2>📈 心情曲線</h2>
             <div style="height:240px;"><canvas id="moodChart"></canvas></div>
         </div>
@@ -275,8 +276,51 @@
             </div>
         </div>
 
+        <div class="card full-width" style="border-left:5px solid #2196F3;">
+            <h2>💳 帳戶餘額對帳</h2>
+            <div id="accountBalanceContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:15px;"><div style="color:#888;">計算中...</div></div>
+        </div>
+
+        <div class="card" style="border-left:5px solid #78909c;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <h2 style="margin:0;">📝 最近紀錄</h2>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <input type="text" id="expSearch" placeholder="🔍 搜尋..." oninput="renderExpenseList()"
+                           style="padding:5px 10px;border-radius:5px;border:1px solid #ddd;background:#f9f9f9;font-size:0.85em;width:80px;">
+                    <select id="recordFilter" onchange="renderExpenseList()" style="padding:5px;border-radius:5px;border:1px solid #ddd;background:#f9f9f9;font-size:0.85em;"></select>
+                </div>
+            </div>
+            <ul id="expenseList" style="list-style:none;padding:0;max-height:300px;overflow-y:auto;">
+                <li style="color:#888;">載入中...</li>
+            </ul>
+        </div>
+
+        <div class="card full-width" style="border-left:5px solid #26c6da;">
+            <h2>📊 本月 vs 上月 支出比較</h2>
+            <div class="grid-container">
+                <div style="height:250px;"><canvas id="expenseCompareChart"></canvas></div>
+                <div>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+                        <thead>
+                            <tr style="border-bottom:2px solid #ddd;text-align:left;">
+                                <th style="padding:8px;">類別</th>
+                                <th style="padding:8px;color:#36a2eb;">本月</th>
+                                <th style="padding:8px;color:#ff6384;">上月</th>
+                                <th style="padding:8px;">差異</th>
+                            </tr>
+                        </thead>
+                        <tbody id="compareTableBody"></tbody>
+                    </table>
+                    <div style="margin-top:15px;">
+                        <div style="padding:8px;background:#fce4ec;border-radius:5px;color:#c2185b;margin-bottom:5px;font-size:0.9em;">📅 上月總支出：<b id="lastMonthTotalDisplay">...</b></div>
+                        <div style="padding:8px;background:#fff3cd;border-radius:5px;color:#856404;font-size:0.9em;">💡 差異：<b id="totalDiff">...</b></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row2">
-        <div class="card">
+        <div class="card" style="border-left:5px solid #43a047;">
             <h2>💸 日常記帳</h2>
             <div style="margin-bottom:15px;">
                 <div style="font-size:0.85em;color:#888;margin-bottom:8px;">⚡ 快速帶入（依你最常記的自動排序）：</div>
@@ -344,33 +388,14 @@
             <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">點長條可切換到那個月。收入一律用「＋ 記收入」或日常記帳選「收入」來記，類別選薪資 / 當沖收入 / 當沖退手續費 / 股票收入 / 股利 / 利息 / 其他收入；當沖與股票買賣賠錢就填負數（圖上當沖與退手續費合併成一條「當沖」）。以前記在資產流水帳（Asset_Log）的薪水、股利、買賣XXXX（算股票收入）也會照關鍵字算進來。</div>
         </div>
 
-        <div class="card full-width">
-            <h2>📊 本月 vs 上月 支出比較</h2>
-            <div class="grid-container">
-                <div style="height:250px;"><canvas id="expenseCompareChart"></canvas></div>
-                <div>
-                    <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
-                        <thead>
-                            <tr style="border-bottom:2px solid #ddd;text-align:left;">
-                                <th style="padding:8px;">類別</th>
-                                <th style="padding:8px;color:#36a2eb;">本月</th>
-                                <th style="padding:8px;color:#ff6384;">上月</th>
-                                <th style="padding:8px;">差異</th>
-                            </tr>
-                        </thead>
-                        <tbody id="compareTableBody"></tbody>
-                    </table>
-                    <div style="margin-top:15px;">
-                        <div style="padding:8px;background:#fce4ec;border-radius:5px;color:#c2185b;margin-bottom:5px;font-size:0.9em;">📅 上月總支出：<b id="lastMonthTotalDisplay">...</b></div>
-                        <div style="padding:8px;background:#fff3cd;border-radius:5px;color:#856404;font-size:0.9em;">💡 差異：<b id="totalDiff">...</b></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <div class="card full-width" style="border-left:5px solid #e91e63;">
-            <h2>📉 每月支出趨勢</h2>
-            <div class="grid-container">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+                <h2 style="margin:0;">📉 每月支出趨勢</h2>
+                <select id="expTrendCat" onchange="loadMonthlyExpense()" style="padding:6px 10px;border-radius:8px;border:1px solid #ddd;background:#f9f9f9;font-size:0.85em;">
+                    <option value="">全部</option><option>食</option><option>衣</option><option>住</option><option>行</option><option>育樂</option><option>其他</option><option>娛樂津貼</option>
+                </select>
+            </div>
+            <div class="grid-container" style="margin-top:12px;">
                 <div style="height:280px;"><canvas id="expenseMonthChart"></canvas></div>
                 <div>
                     <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -383,7 +408,7 @@
                     <ul id="expenseMonthList" style="list-style:none;padding:0;margin:0;max-height:220px;overflow-y:auto;"></ul>
                 </div>
             </div>
-            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">紅線＝每月總支出，虛線＝期間平均。點任一點可切換到那個月看分類與明細。含娛樂津貼支出、排除代墊。</div>
+            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">折線＝每月支出，虛線＝期間平均。右上角可切「全部」或單一類別（食/衣/住…）看該類別的月變化。點任一點可切換到那個月看明細。含娛樂津貼支出、排除代墊。</div>
         </div>
 
         <div class="card full-width" style="border-left:5px solid #8e24aa;">
@@ -434,24 +459,6 @@
             <div id="recurringContainer" style="display:flex;flex-direction:column;gap:8px;">載入中...</div>
         </div>
 
-        <div class="card full-width" style="border-left:5px solid #2196F3;">
-            <h2>💳 帳戶餘額對帳</h2>
-            <div id="accountBalanceContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:15px;"><div style="color:#888;">計算中...</div></div>
-        </div>
-
-        <div class="card">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                <h2 style="margin:0;">📝 最近紀錄</h2>
-                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                    <input type="text" id="expSearch" placeholder="🔍 搜尋..." oninput="renderExpenseList()"
-                           style="padding:5px 10px;border-radius:5px;border:1px solid #ddd;background:#f9f9f9;font-size:0.85em;width:80px;">
-                    <select id="recordFilter" onchange="renderExpenseList()" style="padding:5px;border-radius:5px;border:1px solid #ddd;background:#f9f9f9;font-size:0.85em;"></select>
-                </div>
-            </div>
-            <ul id="expenseList" style="list-style:none;padding:0;max-height:300px;overflow-y:auto;">
-                <li style="color:#888;">載入中...</li>
-            </ul>
-        </div>
       </div>
     </div>
 
@@ -475,7 +482,7 @@
             </div>
         </div>
 
-        <div class="card full-width">
+        <div class="card full-width" style="border-left:5px solid #1e88e5;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                 <h2>📈 資產趨勢</h2>
                 <button onclick="snapshotAssets()" id="btnSnapshot" style="background:#6c757d;font-size:0.8rem;padding:5px 15px;">📸 快照</button>
@@ -483,14 +490,14 @@
             <div style="height:300px;"><canvas id="trendChart"></canvas></div>
         </div>
 
-        <div class="card full-width">
+        <div class="card full-width" style="border-left:5px solid #0097a7;">
             <h2>📊 我的資產 vs 大盤</h2>
             <div style="height:280px;"><canvas id="vsMarketChart"></canvas></div>
             <div style="font-size:0.8em;color:#999;margin-top:6px;">以總資產成長率對照加權指數（從第一次快照起算）。總資產含你的存入，非純投資報酬，僅供走勢對照。</div>
         </div>
 
         <div class="row2">
-        <div class="card">
+        <div class="card" style="border-left:5px solid #5e35b1;">
             <h2>📊 配置比例</h2>
             <div style="height:280px;"><canvas id="assetPieChart"></canvas></div>
         </div>
@@ -532,7 +539,7 @@
 
         </div>
 
-        <div class="card full-width">
+        <div class="card full-width collapse-default" style="border-left:5px solid #546e7a;">
             <h2>📜 持股明細 (庫存)</h2>
             <div id="holdingsList" style="display:flex;flex-direction:column;gap:8px;">
                 <div style="text-align:center;color:#999;padding:20px;">載入中...</div>
@@ -1803,7 +1810,8 @@ function initCollapsibleCards(){
         header.style.cursor='pointer';
         const key='CARD_COL_'+h2.textContent.replace('▾','').trim();
         let saved=null; try{ saved=localStorage.getItem(key); }catch(e){}
-        if(saved==='1') card.classList.add('collapsed');
+        const defCol = card.closest('#view-expenses') || card.classList.contains('collapse-default'); // 收支整頁、以及標記的卡片預設收起
+        if(saved==='1' || (saved===null && defCol)) card.classList.add('collapsed');
         header.addEventListener('click',e=>{
             if(e.target.closest('button,input,select,a,canvas,textarea,label')) return;
             card.classList.toggle('collapsed');
@@ -2587,11 +2595,15 @@ function loadMonthlyExpense(){
 
         const dark=document.body.classList.contains('dark');
         const val=(m,c)=>Math.round((byM[m]||{})[c]||0);
-        const totals=months.map(m=>EXPENSE_CATS.reduce((s,t)=>s+val(m,t.cat),0));
+        const selCat=((document.getElementById('expTrendCat')||{}).value)||''; // 空＝全部
+        const catDef=EXPENSE_CATS.find(t=>t.cat===selCat);
+        const totals=months.map(m=> selCat ? val(m,selCat) : EXPENSE_CATS.reduce((s,t)=>s+val(m,t.cat),0));
         const avg=totals.length?Math.round(totals.reduce((s,v)=>s+v,0)/totals.length):0;
-        const red=dark?'#ef5350':'#e53935', avgCol='#9e9e9e';
+        const lineCol=catDef?(dark?catDef.dark:catDef.color):(dark?'#ef5350':'#e53935');
+        const lineLabel=catDef?(catDef.label+'支出'):'每月支出';
+        const avgCol='#9e9e9e';
         const datasets=[
-            { label:'每月支出', data:totals, borderColor:red, backgroundColor:'rgba(229,57,53,0.10)', borderWidth:2.5, fill:true, tension:0.3, pointRadius:4, pointHoverRadius:6, pointBackgroundColor:red },
+            { label:lineLabel, data:totals, borderColor:lineCol, backgroundColor:lineCol+'1a', borderWidth:2.5, fill:true, tension:0.3, pointRadius:4, pointHoverRadius:6, pointBackgroundColor:lineCol },
             { label:'平均 '+money(avg), data:months.map(()=>avg), borderColor:avgCol, borderWidth:1.5, borderDash:[6,4], pointRadius:0, fill:false, tension:0 }
         ];
         const ctx=document.getElementById('expenseMonthChart'); if(!ctx) return;
