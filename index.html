@@ -17,6 +17,11 @@
         body { font-family: '微軟正黑體', sans-serif; background: #f4f7f6; padding: 15px; display: flex; flex-direction: column; align-items: center; -webkit-user-select: none; user-select: none; margin: 0; padding-bottom: 80px; }
         .container { max-width: 1200px; width: 100%; }
         .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 0; }
+        /* 卡片折疊：收起後只留標題列 */
+        .card.collapsed > *:not(:first-child) { display: none !important; }
+        .card.collapsed > *:first-child { margin-bottom: 0 !important; }
+        .card-chev { display:inline-block; margin-left: 8px; font-size: 0.7em; color: #bbb; transition: transform .2s; }
+        .card.collapsed .card-chev { transform: rotate(-90deg); }
         /* 版面排版：整列堆疊 / 兩欄 / 三欄；窄螢幕一律單欄 */
         .stack { display: flex; flex-direction: column; gap: 20px; }
         .row2, .row3 { display: grid; gap: 20px; align-items: stretch; }
@@ -112,10 +117,10 @@
 
 <nav class="bottom-nav">
     <button class="nav-item active" onclick="switchTab('home',this)"><span>🏠</span>首頁</button>
-    <button class="nav-item" onclick="switchTab('expenses',this)"><span>💸</span>記帳</button>
+    <button class="nav-item" onclick="switchTab('expenses',this)"><span>💸</span>收支</button>
     <button class="nav-item" onclick="switchTab('assets',this)"><span>💰</span>資產</button>
     <button class="nav-item" onclick="switchTab('insights',this)"><span>🔍</span>洞察</button>
-    <button class="nav-item" onclick="switchTab('more',this)"><span>🍔</span>更多</button>
+    <button class="nav-item" onclick="switchTab('more',this)"><span>🎒</span>收藏</button>
 </nav>
 
 <div class="container">
@@ -124,7 +129,7 @@
     <!-- HOME -->
     <div id="view-home" class="view-section active">
       <div class="stack">
-        <div class="card">
+        <div class="card no-collapse">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                 <button onclick="calShift(-1)" style="background:#eceff1;color:#555;box-shadow:none;padding:4px 14px;">◀</button>
                 <h2 id="calLabel" style="margin:0;font-size:1.1rem;">📅 行事曆</h2>
@@ -197,16 +202,6 @@
         </div>
         </div>
 
-        <div class="card">
-            <h2>📈 能力成長曲線</h2>
-            <canvas id="habitChart"></canvas>
-        </div>
-
-        <div class="card">
-            <h2>📈 心情曲線</h2>
-            <div style="height:240px;"><canvas id="moodChart"></canvas></div>
-        </div>
-
       </div>
     </div>
 
@@ -243,6 +238,16 @@
             <h2>🏆 里程碑 & 連續紀錄</h2>
             <div id="milestoneContainer" style="font-size:0.9em;">計算中...</div>
         </div>
+
+        <div class="card">
+            <h2>📈 能力成長曲線</h2>
+            <canvas id="habitChart"></canvas>
+        </div>
+
+        <div class="card">
+            <h2>📈 心情曲線</h2>
+            <div style="height:240px;"><canvas id="moodChart"></canvas></div>
+        </div>
       </div>
     </div>
 
@@ -250,11 +255,11 @@
     <div id="view-expenses" class="view-section">
       <div class="stack">
         <div class="row2">
-            <div class="card" style="background:linear-gradient(135deg,#388e3c 0%,#81c784 100%);color:white;text-align:center;padding:20px;">
+            <div class="card no-collapse" style="background:linear-gradient(135deg,#388e3c 0%,#81c784 100%);color:white;text-align:center;padding:20px;">
                 <h2 style="margin:0;font-size:1rem;opacity:0.9;">💸 生活可用</h2>
                 <div id="livingFundsDisplay" style="font-size:2rem;font-weight:bold;">...</div>
             </div>
-            <div class="card" style="background:linear-gradient(135deg,#e53935 0%,#e57373 100%);color:white;text-align:center;padding:20px;">
+            <div class="card no-collapse" style="background:linear-gradient(135deg,#e53935 0%,#e57373 100%);color:white;text-align:center;padding:20px;">
                 <h2 style="margin:0;font-size:1rem;opacity:0.9;">📉 本月已花</h2>
                 <div id="monthExpenseDisplay" style="font-size:2rem;font-weight:bold;">...</div>
                 <div style="margin-top:10px;">
@@ -309,6 +314,36 @@
         </div>
         </div>
 
+        <div class="card full-width" style="border-left:5px solid #2a78d6;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;">
+                <h2 style="margin:0;">💵 每月收入</h2>
+                <button onclick="toggleIncomeForm()" style="background:#2a78d6;font-size:0.8rem;padding:5px 12px;">＋ 記收入</button>
+            </div>
+            <div id="incomeForm" class="asset-form" style="display:none;background:#f0f4f8;padding:15px;border-radius:10px;margin-bottom:15px;">
+                <label>日期：<input type="date" id="incDate"></label>
+                <label>類型：<select id="incType" onchange="onIncomeTypeChange()"></select></label>
+                <label>入帳帳戶：<select id="incAccount"></select></label>
+                <label>金額：<input type="number" id="incAmount" placeholder="金額"></label>
+                <label>備註：<input type="text" id="incNote" placeholder="選填，如 2330、9月薪"></label>
+                <div id="incHint" style="font-size:0.85em;color:#666;line-height:1.5;"></div>
+                <button onclick="submitIncome(this)" style="background:#2a78d6;color:white;width:100%;">記一筆收入</button>
+            </div>
+            <div class="grid-container">
+                <div style="height:280px;"><canvas id="incomeSourceChart"></canvas></div>
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <button class="quick-btn" onclick="incomeShift(-1)">‹ 上月</button>
+                        <b id="incomeMonthLabel" style="color:#333;">...</b>
+                        <button class="quick-btn" onclick="incomeShift(1)">下月 ›</button>
+                    </div>
+                    <div id="incomeMonthTotal" style="font-size:1.8rem;font-weight:bold;text-align:center;margin:10px 0 6px;color:#333;">...</div>
+                    <div id="incomeBreakdown" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:10px;"></div>
+                    <ul id="incomeRecordList" style="list-style:none;padding:0;margin:0;max-height:220px;overflow-y:auto;"></ul>
+                </div>
+            </div>
+            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">點長條可切換到那個月。收入一律用「＋ 記收入」或日常記帳選「收入」來記，類別選薪資 / 當沖收入 / 當沖退手續費 / 股票收入 / 股利 / 利息 / 其他收入；當沖與股票買賣賠錢就填負數（圖上當沖與退手續費合併成一條「當沖」）。以前記在資產流水帳（Asset_Log）的薪水、股利、買賣XXXX（算股票收入）也會照關鍵字算進來。</div>
+        </div>
+
         <div class="card full-width">
             <h2>📊 本月 vs 上月 支出比較</h2>
             <div class="grid-container">
@@ -331,6 +366,24 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <div class="card full-width" style="border-left:5px solid #e91e63;">
+            <h2>📉 每月支出趨勢</h2>
+            <div class="grid-container">
+                <div style="height:280px;"><canvas id="expenseMonthChart"></canvas></div>
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <button class="quick-btn" onclick="expenseMonShift(-1)">‹ 上月</button>
+                        <b id="expenseMonthLabel" style="color:#333;">...</b>
+                        <button class="quick-btn" onclick="expenseMonShift(1)">下月 ›</button>
+                    </div>
+                    <div id="expenseMonthTotal" style="font-size:1.8rem;font-weight:bold;text-align:center;margin:10px 0 6px;color:#e53935;">...</div>
+                    <div id="expenseMonthBreakdown" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:10px;"></div>
+                    <ul id="expenseMonthList" style="list-style:none;padding:0;margin:0;max-height:220px;overflow-y:auto;"></ul>
+                </div>
+            </div>
+            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">紅線＝每月總支出，虛線＝期間平均。點任一點可切換到那個月看分類與明細。含娛樂津貼支出、排除代墊。</div>
         </div>
 
         <div class="card full-width" style="border-left:5px solid #8e24aa;">
@@ -373,6 +426,19 @@
             <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">規則：水缸每月累積兩種水——🔵 開源＝當月總收入超過「每月預算＋每月投資」的部分；🟢 節源＝當月花費低於「每月預算」省下的部分（超支則倒扣）。要花這筆錢時，記帳類別選「🎟️ 娛樂津貼」，會從水缸扣、不算進當月花費。Settings 分頁可設「每月預算」「每月投資」(決定開源/節源基準)、「娛樂津貼目標」(水缸容量)、「娛樂津貼起算」。目前從 2026/10 起算。</div>
         </div>
 
+        <div class="card full-width" style="border-left:5px solid #009688;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <h2 style="margin:0;">📌 固定支出</h2>
+                <span style="font-size:0.9em;color:#888;">每月共 $<span id="recurringTotal">0</span></span>
+            </div>
+            <div id="recurringContainer" style="display:flex;flex-direction:column;gap:8px;">載入中...</div>
+        </div>
+
+        <div class="card full-width" style="border-left:5px solid #2196F3;">
+            <h2>💳 帳戶餘額對帳</h2>
+            <div id="accountBalanceContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:15px;"><div style="color:#888;">計算中...</div></div>
+        </div>
+
         <div class="card">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                 <h2 style="margin:0;">📝 最近紀錄</h2>
@@ -392,7 +458,7 @@
     <!-- ASSETS -->
     <div id="view-assets" class="view-section">
       <div class="stack">
-        <div class="card full-width" style="background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);color:white;text-align:center;padding:30px;">
+        <div class="card full-width no-collapse" style="background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);color:white;text-align:center;padding:30px;">
             <h2 style="margin:0;font-size:1.2rem;opacity:0.8;">💰 總資產淨值</h2>
             <div id="totalAssetsDisplay" style="font-size:3.5rem;font-weight:bold;margin:10px 0 2px;">計算中...</div>
             <div id="todayPnlDisplay" style="font-size:1rem;font-weight:bold;margin-bottom:8px;opacity:0.95;">今日 計算中…</div>
@@ -445,7 +511,7 @@
                 <label id="stFeeLabel">手續費：<input type="number" id="stFee" placeholder="自動計算" oninput="updateStockPreview(false)" style="width:55%;"></label>
                 <div id="stPreview" style="display:none;background:#f8f9fa;padding:15px;border-radius:10px;line-height:2;font-size:0.95em;"></div>
                 <button onclick="submitStockTrade()" id="btnStTrade" style="background:#fbc02d;color:#333;width:100%;font-size:1rem;">確認交易</button>
-                <div style="font-size:0.8em;color:#999;line-height:1.5;">⚡ 當沖不用在這裡記買賣，直接到下方「每月收入」記一筆「當沖收入」（賠錢填負數），庫存均價才不會被打亂。</div>
+                <div style="font-size:0.8em;color:#999;line-height:1.5;">⚡ 當沖不用在這裡記買賣，直接到「收支」頁的「每月收入」記一筆「當沖收入」（賠錢填負數），庫存均價才不會被打亂。</div>
             </div>
             <div style="margin-top:15px;padding-top:15px;border-top:1px solid #f0f0f0;">
                 <button onclick="toggleAdvancedAsset()" style="background:none;color:#aaa;font-size:0.8rem;padding:4px 10px;box-shadow:none;border:1px solid #eee;border-radius:20px;">⚙️ 其他手動記錄（現金調整 / 加密貨幣...）</button>
@@ -466,36 +532,6 @@
 
         </div>
 
-        <div class="card full-width" style="border-left:5px solid #2a78d6;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;">
-                <h2 style="margin:0;">💵 每月收入</h2>
-                <button onclick="toggleIncomeForm()" style="background:#2a78d6;font-size:0.8rem;padding:5px 12px;">＋ 記收入</button>
-            </div>
-            <div id="incomeForm" class="asset-form" style="display:none;background:#f0f4f8;padding:15px;border-radius:10px;margin-bottom:15px;">
-                <label>日期：<input type="date" id="incDate"></label>
-                <label>類型：<select id="incType" onchange="onIncomeTypeChange()"></select></label>
-                <label>入帳帳戶：<select id="incAccount"></select></label>
-                <label>金額：<input type="number" id="incAmount" placeholder="金額"></label>
-                <label>備註：<input type="text" id="incNote" placeholder="選填，如 2330、9月薪"></label>
-                <div id="incHint" style="font-size:0.85em;color:#666;line-height:1.5;"></div>
-                <button onclick="submitIncome(this)" style="background:#2a78d6;color:white;width:100%;">記一筆收入</button>
-            </div>
-            <div class="grid-container">
-                <div style="height:280px;"><canvas id="incomeSourceChart"></canvas></div>
-                <div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <button class="quick-btn" onclick="incomeShift(-1)">‹ 上月</button>
-                        <b id="incomeMonthLabel" style="color:#333;">...</b>
-                        <button class="quick-btn" onclick="incomeShift(1)">下月 ›</button>
-                    </div>
-                    <div id="incomeMonthTotal" style="font-size:1.8rem;font-weight:bold;text-align:center;margin:10px 0 6px;color:#333;">...</div>
-                    <div id="incomeBreakdown" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:10px;"></div>
-                    <ul id="incomeRecordList" style="list-style:none;padding:0;margin:0;max-height:220px;overflow-y:auto;"></ul>
-                </div>
-            </div>
-            <div style="font-size:0.8em;color:#999;margin-top:10px;line-height:1.6;">點長條可切換到那個月。收入一律用「＋ 記收入」或日常記帳選「收入」來記，類別選薪資 / 當沖收入 / 當沖退手續費 / 股票收入 / 股利 / 利息 / 其他收入；當沖與股票買賣賠錢就填負數（圖上當沖與退手續費合併成一條「當沖」）。以前記在資產流水帳（Asset_Log）的薪水、股利、買賣XXXX（算股票收入）也會照關鍵字算進來。</div>
-        </div>
-
         <div class="card full-width">
             <h2>📜 持股明細 (庫存)</h2>
             <div id="holdingsList" style="display:flex;flex-direction:column;gap:8px;">
@@ -513,19 +549,6 @@
         </div>
 
       <div class="stack">
-        <div class="card full-width" style="border-left:5px solid #009688;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                <h2 style="margin:0;">📌 固定支出</h2>
-                <span style="font-size:0.9em;color:#888;">每月共 $<span id="recurringTotal">0</span></span>
-            </div>
-            <div id="recurringContainer" style="display:flex;flex-direction:column;gap:8px;">載入中...</div>
-        </div>
-
-        <div class="card full-width" style="border-left:5px solid #2196F3;">
-            <h2>💳 帳戶餘額對帳</h2>
-            <div id="accountBalanceContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:15px;"><div style="color:#888;">計算中...</div></div>
-        </div>
-
         <div class="card full-width" style="border-left:5px solid #ff9800;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
                 <h2>🛍️ 夢想購物車</h2>
@@ -799,7 +822,7 @@ function collectIncome(logData, expData) {
 Chart.register(ChartDataLabels);
 Chart.defaults.set('plugins.datalabels', { display: false });
 
-let myChart=null, assetChart=null, incomeChart=null, compareChart=null, trendChart=null, moodChart=null, vsChart=null, forecastChart=null, healthChart=null;
+let myChart=null, assetChart=null, incomeChart=null, compareChart=null, trendChart=null, moodChart=null, vsChart=null, forecastChart=null, healthChart=null, expenseMonChart=null;
 let globalSnapshotData=[], globalTotalAssets=0, globalLivingFunds=0, globalExpensesData=[], globalIncomeRecs=[];
 let expShowCount=20; // 記帳列表目前顯示筆數（「載入更多」會增加）
 let editingExpenseId=null; // 記帳編輯模式：非 null 表示正在編輯該筆 ID
@@ -1769,6 +1792,26 @@ function switchTab(tabId, navEl) {
     window.dispatchEvent(new Event('resize'));
 }
 
+// 卡片折疊：點標題收起/展開（狀態記在瀏覽器），標記 no-collapse 的卡片除外
+function initCollapsibleCards(){
+    document.querySelectorAll('.card').forEach(card=>{
+        if(card.classList.contains('no-collapse')) return;
+        const h2=card.querySelector('h2'), header=card.firstElementChild;
+        if(!h2||!header||h2.querySelector('.card-chev')) return;
+        const chev=document.createElement('span'); chev.className='card-chev'; chev.textContent='▾';
+        h2.appendChild(chev);
+        header.style.cursor='pointer';
+        const key='CARD_COL_'+h2.textContent.replace('▾','').trim();
+        let saved=null; try{ saved=localStorage.getItem(key); }catch(e){}
+        if(saved==='1') card.classList.add('collapsed');
+        header.addEventListener('click',e=>{
+            if(e.target.closest('button,input,select,a,canvas,textarea,label')) return;
+            card.classList.toggle('collapsed');
+            try{ localStorage.setItem(key, card.classList.contains('collapsed')?'1':'0'); }catch(e){}
+        });
+    });
+}
+
 // ==========================================
 // 🚀 頁面載入：一次預載所有資料
 // ==========================================
@@ -1799,6 +1842,7 @@ window.onload = async function() {
     loadExpenses();
     loadExpenseComparison();
     loadMonthlyIncome();
+    loadMonthlyExpense();
     loadAccountBalances();
     loadTrendChart();
     loadVsMarket();
@@ -1818,6 +1862,7 @@ window.onload = async function() {
     loadTravel();
 
     applyDarkMode(); // 同步深色狀態與按鈕文字
+    initCollapsibleCards(); // 讓卡片可折疊
 };
 
 // ==========================================
@@ -2454,7 +2499,7 @@ function renderFunAllowance(logData, expData){
 // 功能 8：每月收入（薪資 / 當沖 / 當沖退手續費 / 股利 / 利息 / 其他）
 // 資料來源見 collectIncome；當沖可能為負，堆疊長條會往 0 以下長，折線是當月合計
 let incomeYm=null; // 右側明細目前看的月份
-function refreshMoneyViews(){ loadExpenses(); loadExpenseComparison(); loadAccountBalances(); loadMonthlyIncome(); loadAssetChart(); }
+function refreshMoneyViews(){ loadExpenses(); loadExpenseComparison(); loadAccountBalances(); loadMonthlyIncome(); loadMonthlyExpense(); loadAssetChart(); }
 function loadMonthlyIncome() {
     Promise.all([fetchTab('Asset_Log'), fetchTab('Expenses_DB')]).then(([logData, expData])=>{
         const recs=collectIncome(logData, expData);
@@ -2508,6 +2553,75 @@ function renderIncomeMonth(){
             ? `<button class="inc-edit" data-id="${esc(r.id)}" style="background:#fff3e0;color:#e65100;padding:4px 8px;font-size:0.8rem;border-radius:5px;box-shadow:none;border:1px solid #ffe0b2;margin-left:6px;">✏️</button><button class="inc-del" data-id="${esc(r.id)}" data-d="${esc(r.date)}" data-i="${esc(r.item)}" data-a="${esc(r.raw)}" style="background:#ffebee;color:#c62828;padding:4px 8px;font-size:0.8rem;border-radius:5px;box-shadow:none;border:1px solid #ffcdd2;margin-left:5px;">🗑️</button>`
             : `<span title="記在資產流水帳（Asset_Log），要改請到試算表" style="font-size:0.75em;color:#aaa;margin-left:6px;white-space:nowrap;">資產帳</span>`;
         return `<li style="display:flex;align-items:center;padding:8px 4px;border-bottom:1px solid #eee;"><div style="flex:1;min-width:0;"><span style="color:#333;">${t.icon} ${esc(r.item)}</span><br><span style="font-size:0.8em;color:#999;">${esc(r.date.slice(5))} · ${esc(accLabel(r.acc))}</span></div><b style="color:${col};white-space:nowrap;">${money(r.amt, true)}</b>${btns}</li>`;
+    }).join('');
+}
+// ===== 每月支出（分類別堆疊長條，跟每月收入同款）=====
+const EXPENSE_CATS = [
+    { cat:'食',    label:'食',      icon:'🍱', color:'#ff7043', dark:'#ff8a65' },
+    { cat:'衣',    label:'衣',      icon:'👕', color:'#ab47bc', dark:'#ba68c8' },
+    { cat:'住',    label:'住',      icon:'🏠', color:'#5c6bc0', dark:'#7986cb' },
+    { cat:'行',    label:'行',      icon:'🚆', color:'#26a69a', dark:'#4db6ac' },
+    { cat:'育樂',  label:'育樂',    icon:'🎮', color:'#ffca28', dark:'#ffd54f' },
+    { cat:'其他',  label:'其他',    icon:'🛒', color:'#78909c', dark:'#90a4ae' },
+    { cat:FUN_CAT, label:'娛樂津貼', icon:'🎟️', color:'#ec407a', dark:'#f06292' },
+];
+let expenseYm=null, globalExpMonRecs=[];
+function loadMonthlyExpense(){
+    fetchTab('Expenses_DB').then(expData=>{
+        const recs=[];
+        (Array.isArray(expData)?expData:[]).forEach(r=>{
+            if(r.收支!=='支出') return;
+            const rawCat=String(fCategory(r)).trim();
+            if(rawCat===LEND_CAT) return; // 代墊不算自己支出
+            const ym=ymOf(r.日期); if(!ym) return;
+            const cat=EXPENSE_CATS.some(x=>x.cat===rawCat)?rawCat:'其他'; // 未知類別歸「其他」
+            recs.push({ ym, cat, item:String(fItem(r)), acc:String(r.帳戶||''), amt:n(r.金額), date:formatDate(r.日期) });
+        });
+        globalExpMonRecs=recs;
+        const byM={};
+        recs.forEach(r=>{ const m=byM[r.ym]||(byM[r.ym]={}); m[r.cat]=(m[r.cat]||0)+r.amt; });
+        const cur=ymNow(), keys=Object.keys(byM).sort();
+        let last=cur; if(keys.length&&keys[keys.length-1]>last) last=keys[keys.length-1];
+        let first=ymAdd(last,-11); if(keys.length&&keys[0]>first) first=keys[0];
+        const months=[]; for(let ym=first,g=0; ym<=last&&g<24; ym=ymAdd(ym,1),g++) months.push(ym);
+
+        const dark=document.body.classList.contains('dark');
+        const val=(m,c)=>Math.round((byM[m]||{})[c]||0);
+        const totals=months.map(m=>EXPENSE_CATS.reduce((s,t)=>s+val(m,t.cat),0));
+        const avg=totals.length?Math.round(totals.reduce((s,v)=>s+v,0)/totals.length):0;
+        const red=dark?'#ef5350':'#e53935', avgCol='#9e9e9e';
+        const datasets=[
+            { label:'每月支出', data:totals, borderColor:red, backgroundColor:'rgba(229,57,53,0.10)', borderWidth:2.5, fill:true, tension:0.3, pointRadius:4, pointHoverRadius:6, pointBackgroundColor:red },
+            { label:'平均 '+money(avg), data:months.map(()=>avg), borderColor:avgCol, borderWidth:1.5, borderDash:[6,4], pointRadius:0, fill:false, tension:0 }
+        ];
+        const ctx=document.getElementById('expenseMonthChart'); if(!ctx) return;
+        if(expenseMonChart) expenseMonChart.destroy();
+        expenseMonChart=new Chart(ctx,{type:'line',data:{labels:months.map(m=>m.slice(2)),datasets},options:{responsive:true,maintainAspectRatio:false,
+            interaction:{mode:'index',intersect:false},
+            onClick:(e,els)=>{ if(els.length){ expenseYm=months[els[0].index]; renderExpenseMonth(); } },
+            plugins:{legend:{position:'bottom',labels:{boxWidth:12}},tooltip:{
+                callbacks:{title:items=>items.length?months[items[0].dataIndex]:'', label:c=>c.dataset.label.indexOf('平均')===0?('平均：'+money(avg)):('支出：'+money(c.parsed.y))}}},
+            scales:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{callback:v=>money(v)}}}}});
+
+        if(!expenseYm) expenseYm=cur;
+        renderExpenseMonth();
+    }).catch(()=>{});
+}
+function expenseMonShift(d){ const nx=ymAdd(expenseYm||ymNow(), d); if(nx>ymNow()) return; expenseYm=nx; renderExpenseMonth(); }
+function renderExpenseMonth(){
+    const ym=expenseYm||ymNow(), recs=(globalExpMonRecs||[]).filter(r=>r.ym===ym);
+    const lbl=document.getElementById('expenseMonthLabel'); if(lbl) lbl.innerText=ym+(ym===ymNow()?'（本月）':'');
+    const total=recs.reduce((s,r)=>s+r.amt,0), tEl=document.getElementById('expenseMonthTotal');
+    if(tEl) tEl.innerText=money(total);
+    const dark=document.body.classList.contains('dark'), sums={};
+    recs.forEach(r=>{ sums[r.cat]=(sums[r.cat]||0)+r.amt; });
+    const bd=document.getElementById('expenseMonthBreakdown');
+    if(bd) bd.innerHTML=EXPENSE_CATS.filter(t=>sums[t.cat]).map(t=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:0.85em;background:#f8f9fa;border:1px solid #eee;border-radius:12px;padding:3px 10px;color:#555;"><span style="width:9px;height:9px;border-radius:50%;background:${dark?t.dark:t.color};"></span>${t.icon} ${t.label} <b style="color:#333;">${money(sums[t.cat])}</b></span>`).join('');
+    const list=document.getElementById('expenseMonthList'); if(!list) return;
+    if(!recs.length){ list.innerHTML='<li style="color:#aaa;text-align:center;padding:12px;">這個月還沒有支出紀錄</li>'; return; }
+    list.innerHTML=recs.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(r=>{
+        const t=EXPENSE_CATS.find(x=>x.cat===r.cat)||{icon:'🛒'};
+        return `<li style="display:flex;align-items:center;padding:8px 4px;border-bottom:1px solid #eee;"><div style="flex:1;min-width:0;"><span style="color:#333;">${t.icon} ${esc(r.item)}</span><br><span style="font-size:0.8em;color:#999;">${esc(r.date.slice(5))} · ${esc(accLabel(r.acc))} · ${esc(r.cat)}</span></div><b style="color:#e53935;white-space:nowrap;">${money(r.amt)}</b></li>`;
     }).join('');
 }
 function toggleIncomeForm(){
