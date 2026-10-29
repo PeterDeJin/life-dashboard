@@ -276,6 +276,45 @@
             </div>
         </div>
 
+        <div class="row2">
+        <div class="card collapse-open" style="border-left:5px solid #43a047;">
+            <h2>💸 日常記帳</h2>
+            <div style="margin-bottom:15px;">
+                <div style="font-size:0.85em;color:#888;margin-bottom:8px;">⚡ 快速帶入（依你最常記的自動排序）：</div>
+                <div id="quickFillBox" style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="quick-btn" data-item="午餐" data-cat="食" data-amt="80" data-acc="錢包">🍱 午餐 $80</button>
+                    <button class="quick-btn" data-item="早餐" data-cat="食" data-amt="50" data-acc="錢包">☕ 早餐 $50</button>
+                    <button class="quick-btn" data-item="晚餐" data-cat="食" data-amt="100" data-acc="錢包">🍜 晚餐 $100</button>
+                    <button class="quick-btn" data-item="捷運" data-cat="行" data-amt="30" data-acc="悠遊卡">🚇 捷運 $30</button>
+                    <button class="quick-btn" data-item="飲料" data-cat="食" data-amt="45" data-acc="錢包">🧋 飲料 $45</button>
+                </div>
+            </div>
+            <div class="asset-form">
+                <label>日期：<input type="date" id="expDate"></label>
+                <label>收支：<select id="expType" onchange="syncExpForm()"><option value="支出">支出</option><option value="收入">收入</option></select></label>
+                <label>帳戶：<select id="expAccount"></select></label>
+                <label>類別：<select id="expCategory"></select></label>
+                <label>項目：<input type="text" id="expItem" placeholder="如: 午餐"></label>
+                <label>金額：<input type="number" id="expAmount" placeholder="100"></label>
+                <button onclick="submitExpense()" id="btnExp" style="background:#e91e63;width:100%;">記一筆</button>
+            </div>
+        </div>
+
+        <div class="card collapse-open" style="border-left:5px solid #9c27b0;">
+            <h2>🔄 轉帳 / 領錢</h2>
+            <div class="asset-form">
+                <label>日期：<input type="date" id="transDate"></label>
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <select id="transFrom" style="width:100%"></select>
+                    <span>➡</span>
+                    <select id="transTo" style="width:100%"></select>
+                </div>
+                <label>金額：<input type="number" id="transAmount" placeholder="1000"></label>
+                <button onclick="submitTransfer()" id="btnTrans" style="background:#9c27b0;width:100%;">確認</button>
+            </div>
+        </div>
+        </div>
+
         <div class="card full-width" style="border-left:5px solid #2196F3;">
             <h2>💳 帳戶餘額對帳</h2>
             <div id="accountBalanceContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:15px;"><div style="color:#888;">計算中...</div></div>
@@ -317,45 +356,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-
-        <div class="row2">
-        <div class="card" style="border-left:5px solid #43a047;">
-            <h2>💸 日常記帳</h2>
-            <div style="margin-bottom:15px;">
-                <div style="font-size:0.85em;color:#888;margin-bottom:8px;">⚡ 快速帶入（依你最常記的自動排序）：</div>
-                <div id="quickFillBox" style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <button class="quick-btn" data-item="午餐" data-cat="食" data-amt="80" data-acc="錢包">🍱 午餐 $80</button>
-                    <button class="quick-btn" data-item="早餐" data-cat="食" data-amt="50" data-acc="錢包">☕ 早餐 $50</button>
-                    <button class="quick-btn" data-item="晚餐" data-cat="食" data-amt="100" data-acc="錢包">🍜 晚餐 $100</button>
-                    <button class="quick-btn" data-item="捷運" data-cat="行" data-amt="30" data-acc="悠遊卡">🚇 捷運 $30</button>
-                    <button class="quick-btn" data-item="飲料" data-cat="食" data-amt="45" data-acc="錢包">🧋 飲料 $45</button>
-                </div>
-            </div>
-            <div class="asset-form">
-                <label>日期：<input type="date" id="expDate"></label>
-                <label>收支：<select id="expType" onchange="syncExpForm()"><option value="支出">支出</option><option value="收入">收入</option></select></label>
-                <label>帳戶：<select id="expAccount"></select></label>
-                <label>類別：<select id="expCategory"></select></label>
-                <label>項目：<input type="text" id="expItem" placeholder="如: 午餐"></label>
-                <label>金額：<input type="number" id="expAmount" placeholder="100"></label>
-                <button onclick="submitExpense()" id="btnExp" style="background:#e91e63;width:100%;">記一筆</button>
-            </div>
-        </div>
-
-        <div class="card" style="border-left:5px solid #9c27b0;">
-            <h2>🔄 轉帳 / 領錢</h2>
-            <div class="asset-form">
-                <label>日期：<input type="date" id="transDate"></label>
-                <div style="display:flex;gap:10px;align-items:center;">
-                    <select id="transFrom" style="width:100%"></select>
-                    <span>➡</span>
-                    <select id="transTo" style="width:100%"></select>
-                </div>
-                <label>金額：<input type="number" id="transAmount" placeholder="1000"></label>
-                <button onclick="submitTransfer()" id="btnTrans" style="background:#9c27b0;width:100%;">確認</button>
-            </div>
-        </div>
         </div>
 
         <div class="card full-width" style="border-left:5px solid #2a78d6;">
@@ -1810,7 +1810,7 @@ function initCollapsibleCards(){
         header.style.cursor='pointer';
         const key='CARD_COL_'+h2.textContent.replace('▾','').trim();
         let saved=null; try{ saved=localStorage.getItem(key); }catch(e){}
-        const defCol = card.closest('#view-expenses') || card.classList.contains('collapse-default'); // 收支整頁、以及標記的卡片預設收起
+        const defCol = (card.closest('#view-expenses') || card.classList.contains('collapse-default')) && !card.classList.contains('collapse-open'); // 收支整頁/標記者預設收起，collapse-open 例外（預設展開）
         if(saved==='1' || (saved===null && defCol)) card.classList.add('collapsed');
         header.addEventListener('click',e=>{
             if(e.target.closest('button,input,select,a,canvas,textarea,label')) return;
@@ -1826,6 +1826,7 @@ function initCollapsibleCards(){
 window.onload = async function() {
     buildSelects();      // 由設定檔生成所有帳戶/類別下拉選單
     setupDelegation();   // 列表按鈕事件委派（避免 inline onclick 注入）
+    initCollapsibleCards(); // 卡片折疊：卡片是靜態 DOM，先套用避免載入時先展開再收起的閃動
 
     const today = new Date().toISOString().split('T')[0];
     ['habitDate','assetDate','stDate','expDate','transDate','mediaDate','evtDate','incDate'].forEach(id => {
@@ -1870,7 +1871,6 @@ window.onload = async function() {
     loadTravel();
 
     applyDarkMode(); // 同步深色狀態與按鈕文字
-    initCollapsibleCards(); // 讓卡片可折疊
 };
 
 // ==========================================
