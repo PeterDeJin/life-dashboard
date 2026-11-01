@@ -28,7 +28,11 @@
         .row2, .row3 { display: grid; gap: 20px; align-items: stretch; }
         .row2 { grid-template-columns: 1fr 1fr; }
         .row3 { grid-template-columns: 1fr 1fr 1fr; }
-        @media (max-width: 820px) { .row2, .row3 { grid-template-columns: 1fr; } }
+        @media (max-width: 820px) {
+            .row2, .row3 { grid-template-columns: 1fr; }
+            /* 首頁窄螢幕（手機/平板）把「今天打卡」與「待辦事項」對調 */
+            .home-top > *:nth-child(1){order:1} .home-top > *:nth-child(2){order:3} .home-top > *:nth-child(3){order:2} .home-top > *:nth-child(4){order:4}
+        }
         .full-width { width: 100%; box-sizing: border-box; }
         .check-in-box { background: linear-gradient(135deg, #e0f7fa 0%, #ffffff 100%); border: 2px solid #b2ebf2; }
         .asset-form { display: flex; flex-direction: column; gap: 15px; }
@@ -140,7 +144,7 @@
             <div id="calDetail" style="margin-top:12px;border-top:1px solid #eee;padding-top:10px;font-size:0.9em;"></div>
         </div>
 
-        <div class="row2">
+        <div class="row2 home-top">
         <div class="card full-width" style="background:linear-gradient(135deg,#2c3e50 0%,#4ca1af 100%);color:white;padding:20px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
                 <h2 style="margin:0;font-size:1.1rem;opacity:0.9;">⏳ 時間倒數</h2>
@@ -170,9 +174,7 @@
             <button onclick="submitHabit()" id="submitBtn" style="background:#00897b;width:100%;">送出紀錄</button>
             <span id="statusMsg" style="margin-left:10px;color:#666;"></span>
         </div>
-        </div>
 
-        <div class="row2">
         <div class="card" style="border-left:5px solid #3f51b5;">
             <h2>✅ 待辦事項</h2>
             <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
