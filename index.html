@@ -499,10 +499,10 @@
         </div>
 
         <div class="card full-width" style="border-left:5px solid #2e7d32;">
-            <h2>📈 股票投資報酬（每月已實現）</h2>
-            <div style="height:280px;"><canvas id="investReturnChart"></canvas></div>
-            <div id="investReturnSummary" style="font-size:0.85em;color:#888;margin-top:10px;"></div>
-            <div style="font-size:0.78em;color:#aaa;margin-top:4px;line-height:1.5;">每月一點：當沖（含退手續費）＋股票買賣已實現＋股利。正綠負紅，灰虛線為區間平均。不含庫存未實現（帳面）損益。</div>
+            <h2>📈 投組市值 × 已實現損益</h2>
+            <div style="height:280px;"><canvas id="portfolioPerfChart"></canvas></div>
+            <div id="portfolioPerfSummary" style="font-size:0.85em;color:#888;margin-top:10px;"></div>
+            <div style="font-size:0.78em;color:#aaa;margin-top:4px;line-height:1.5;">三條線（點下方圖例可自由開關）：投組市值（非現金庫存總市值，靠「📸 快照」更新）、累積已實現損益（當沖＋股票＋股利 一路累加）、以及兩者相加。市值要常按快照才會跟上。</div>
         </div>
 
         <div class="row2">
@@ -838,7 +838,7 @@ function collectIncome(logData, expData) {
 Chart.register(ChartDataLabels);
 Chart.defaults.set('plugins.datalabels', { display: false });
 
-let myChart=null, assetChart=null, incomeChart=null, compareChart=null, trendChart=null, moodChart=null, vsChart=null, forecastChart=null, healthChart=null, expenseMonChart=null, investReturnChart=null;
+let myChart=null, assetChart=null, incomeChart=null, compareChart=null, trendChart=null, moodChart=null, vsChart=null, forecastChart=null, healthChart=null, expenseMonChart=null, portfolioPerfChart=null;
 let globalSnapshotData=[], globalTotalAssets=0, globalLivingFunds=0, globalExpensesData=[], globalIncomeRecs=[];
 let expShowCount=20; // 記帳列表目前顯示筆數（「載入更多」會增加）
 let editingExpenseId=null; // 記帳編輯模式：非 null 表示正在編輯該筆 ID
@@ -1864,7 +1864,7 @@ window.onload = async function() {
     loadAccountBalances();
     loadTrendChart();
     loadVsMarket();
-    loadInvestReturn();
+    loadPortfolioPerf();
     loadMediaList();
     loadTimeWidget();
     loadRecurring();
@@ -1939,7 +1939,7 @@ function submitAsset() {
         if(data.includes("Success")){
             toast("💰 資產紀錄成功！", 'success'); reset();
             document.getElementById('assetItem').value=""; document.getElementById('assetAmount').value="";
-            invalidateCache('Asset_Log'); loadAssetChart(); loadMonthlyIncome(); loadAccountBalances(); loadInvestReturn();
+            invalidateCache('Asset_Log'); loadAssetChart(); loadMonthlyIncome(); loadAccountBalances(); loadPortfolioPerf();
         } else { toast("失敗："+data, 'error'); reset(); }
     }).catch(() => { toast("連線錯誤，請重試", 'error'); reset(); });
 }
@@ -2124,7 +2124,7 @@ async function submitStockTrade() {
             ['stShares','stPrice','stCode','stFee'].forEach(id => document.getElementById(id).value = '');
             preview.style.display = 'none';
             invalidateCache('Asset_Log');
-            loadAssetChart(); loadAccountBalances(); loadMonthlyIncome(); loadInvestReturn();
+            loadAssetChart(); loadAccountBalances(); loadMonthlyIncome(); loadPortfolioPerf();
         } else {
             toast('寫入失敗：' + res, 'error');
         }
@@ -2517,7 +2517,7 @@ function renderFunAllowance(logData, expData){
 // 功能 8：每月收入（薪資 / 當沖 / 當沖退手續費 / 股利 / 利息 / 其他）
 // 資料來源見 collectIncome；當沖可能為負，堆疊長條會往 0 以下長，折線是當月合計
 let incomeYm=null; // 右側明細目前看的月份
-function refreshMoneyViews(){ loadExpenses(); loadExpenseComparison(); loadAccountBalances(); loadMonthlyIncome(); loadMonthlyExpense(); loadAssetChart(); loadInvestReturn(); }
+function refreshMoneyViews(){ loadExpenses(); loadExpenseComparison(); loadAccountBalances(); loadMonthlyIncome(); loadMonthlyExpense(); loadAssetChart(); loadPortfolioPerf(); }
 function loadMonthlyIncome() {
     Promise.all([fetchTab('Asset_Log'), fetchTab('Expenses_DB')]).then(([logData, expData])=>{
         const recs=collectIncome(logData, expData);
@@ -2646,44 +2646,61 @@ function renderExpenseMonth(){
         return `<li style="display:flex;align-items:center;padding:8px 4px;border-bottom:1px solid #eee;"><div style="flex:1;min-width:0;"><span style="color:#333;">${t.icon} ${esc(r.item)}</span><br><span style="font-size:0.8em;color:#999;">${esc(r.date.slice(5))} · ${esc(accLabel(r.acc))} · ${esc(r.cat)}</span></div><b style="color:#e53935;white-space:nowrap;">${money(r.amt)}</b></li>`;
     }).join('');
 }
-// 功能 8c：股票投資報酬（每月已實現）＝ 當沖(含退手續費) ＋ 股票買賣已實現 ＋ 股利
+// 功能 8c：投組市值 ＋ 累積已實現損益（第三條＝兩者相加；點圖例可自由開關要顯示哪幾條）
+// 投組市值＝每次快照「非現金庫存」的現淨值加總；累積已實現＝當沖＋股票＋股利 一路往上累加。
 const INVEST_GRPS=['daytrade','stock','dividend'];
-function loadInvestReturn(){
-    Promise.all([fetchTab('Asset_Log'), fetchTab('Expenses_DB')]).then(([logData, expData])=>{
-        const recs=collectIncome(logData, expData).filter(r=>INVEST_GRPS.includes(KIND_GRP[r.kind]));
-        const byM={}, byMG={};
-        recs.forEach(r=>{ const gp=KIND_GRP[r.kind]; byM[r.ym]=(byM[r.ym]||0)+r.amt; const g=byMG[r.ym]||(byMG[r.ym]={}); g[gp]=(g[gp]||0)+r.amt; });
-        const cur=ymNow(), keys=Object.keys(byM).sort();
-        let last=cur; if(keys.length&&keys[keys.length-1]>last) last=keys[keys.length-1];
-        let first=ymAdd(last,-11); if(keys.length&&keys[0]>first) first=keys[0];
-        const months=[]; for(let ym=first,g=0; ym<=last&&g<24; ym=ymAdd(ym,1),g++) months.push(ym);
+function parsePerfTs(d){ const p=String(d||'').replace(/\//g,'-').split('T')[0].split('-'); return p.length>=3?new Date(+p[0],+p[1]-1,+p[2]).getTime():0; }
+function loadPortfolioPerf(){
+    Promise.all([fetchTab('Asset_Log'), fetchTab('Expenses_DB'), fetchTab('History_Log')]).then(([logData, expData, hist])=>{
+        const isCashName=nm=>/郵局|銀行|現金|錢包|中國信託|悠遊卡|icash|ipassmoney|學生證|一卡通|待付款/.test(nm);
+        // 1) 每個快照日：投組市值＝非現金庫存現淨值加總；用「總資產」列確認是真的快照日
+        const byDate={};
+        (Array.isArray(hist)?hist:[]).forEach(r=>{
+            const name=String(r.資產名稱||'').trim(); if(!name) return;
+            const p=String(r.日期||'').replace(/\//g,'-').split('T')[0].split('-'); if(p.length<3) return;
+            const key=(+p[0])+'/'+(+p[1])+'/'+(+p[2]), ts=new Date(+p[0],+p[1]-1,+p[2]).getTime();
+            const rec=byDate[key]||(byDate[key]={ts, mv:0, snap:false});
+            if(name==='總資產'){ rec.snap=true; return; }
+            if(/總金額|總計|合計|淨值/.test(name)||name.toLowerCase().includes('beta')) return;
+            if(isCashName(name)) return;
+            rec.mv+=n(r.現淨值);
+        });
+        const dates=Object.keys(byDate).filter(k=>byDate[k].snap).sort((a,b)=>byDate[a].ts-byDate[b].ts);
+        // 2) 投資已實現（帶時間戳），用來算每個快照日的「累積已實現」
+        const recs=collectIncome(logData, expData).filter(r=>INVEST_GRPS.includes(KIND_GRP[r.kind]))
+            .map(r=>({ts:parsePerfTs(r.date), amt:r.amt})).filter(r=>r.ts);
+        const realizedCumAt=ts=>recs.reduce((s,r)=>s+(r.ts<=ts?r.amt:0),0);
 
+        const ctx=document.getElementById('portfolioPerfChart'); if(!ctx) return;
+        const sEl=document.getElementById('portfolioPerfSummary');
+        if(!dates.length){
+            if(portfolioPerfChart){ portfolioPerfChart.destroy(); portfolioPerfChart=null; }
+            if(sEl) sEl.innerHTML='<span style="color:#e67e22;">還沒有任何「📸 快照」，投組市值畫不出來。先按一次快照就會開始記錄。</span>';
+            return;
+        }
+        const mvArr=dates.map(k=>Math.round(byDate[k].mv));
+        const realArr=dates.map(k=>Math.round(realizedCumAt(byDate[k].ts)));
+        const sumArr=dates.map((k,i)=>mvArr[i]+realArr[i]);
         const dark=document.body.classList.contains('dark');
-        const data=months.map(m=>Math.round(byM[m]||0));
-        const posCol=dark?'#66bb6a':'#2e7d32', negCol=dark?'#ef5350':'#e53935', avgCol='#9e9e9e';
-        const ptCol=data.map(v=>v<0?negCol:posCol);
-        const avg=data.length?Math.round(data.reduce((s,v)=>s+v,0)/data.length):0;
-        const cum=data.reduce((s,v)=>s+v,0);
-        const grpLabel={daytrade:'當沖',stock:'股票',dividend:'股利'};
+        const cMv=dark?'#64b5f6':'#1e88e5', cReal=dark?'#66bb6a':'#2e7d32', cSum=dark?'#ba68c8':'#8e44ad';
         const datasets=[
-            { label:'每月已實現', data, borderColor:posCol, backgroundColor:posCol+'1a', borderWidth:2.5, fill:true, tension:0.3,
-              pointRadius:4, pointHoverRadius:6, pointBackgroundColor:ptCol, pointBorderColor:ptCol },
-            { label:'平均 '+money(avg,true), data:months.map(()=>avg), borderColor:avgCol, borderWidth:1.5, borderDash:[6,4], pointRadius:0, fill:false, tension:0 }
+            { label:'投組市值', data:mvArr, borderColor:cMv, backgroundColor:cMv+'1a', borderWidth:2.5, fill:false, tension:0.2, pointRadius:3, pointHoverRadius:6 },
+            { label:'累積已實現', data:realArr, borderColor:cReal, backgroundColor:cReal+'1a', borderWidth:2.5, fill:false, tension:0.2, pointRadius:3, pointHoverRadius:6 },
+            { label:'市值＋已實現', data:sumArr, borderColor:cSum, backgroundColor:cSum+'1a', borderWidth:2, borderDash:[6,4], fill:false, tension:0.2, pointRadius:0, pointHoverRadius:5, hidden:true }
         ];
-        const ctx=document.getElementById('investReturnChart'); if(!ctx) return;
-        if(investReturnChart) investReturnChart.destroy();
-        investReturnChart=new Chart(ctx,{type:'line',data:{labels:months.map(m=>m.slice(2)),datasets},options:{responsive:true,maintainAspectRatio:false,
+        const labels=dates.map(k=>{ const q=k.split('/'); return q[1]+'/'+q[2]; });
+        if(portfolioPerfChart) portfolioPerfChart.destroy();
+        portfolioPerfChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,
             interaction:{mode:'index',intersect:false},
             plugins:{legend:{position:'bottom',labels:{boxWidth:12}},tooltip:{
                 callbacks:{
-                    title:items=>items.length?months[items[0].dataIndex]:'',
-                    label:c=>c.dataset.label.indexOf('平均')===0?('平均：'+money(avg,true)):('當月已實現：'+money(c.parsed.y,true)),
-                    afterBody:items=>{ if(!items.length) return ''; const g=byMG[months[items[0].dataIndex]]||{}; return INVEST_GRPS.filter(k=>g[k]).map(k=>'　'+grpLabel[k]+'：'+money(Math.round(g[k]),true)); }
+                    title:items=>items.length?dates[items[0].dataIndex]:'',
+                    label:c=>c.dataset.label+'：'+money(c.parsed.y)
                 }}},
             scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>money(v)}}}}});
 
-        const sEl=document.getElementById('investReturnSummary');
-        if(sEl) sEl.innerHTML=`區間累積 <b style="color:${cum<0?negCol:posCol};">${money(cum,true)}</b>　·　平均每月 <b style="color:${avg<0?negCol:posCol};">${money(avg,true)}</b>　·　共 ${months.length} 個月`;
+        const li=dates.length-1;
+        if(sEl) sEl.innerHTML=`最新（${dates[li]}）：投組市值 <b style="color:${cMv};">${money(mvArr[li])}</b>　·　累積已實現 <b style="color:${cReal};">${money(realArr[li])}</b>　·　合計 <b style="color:${cSum};">${money(sumArr[li])}</b>`;
     }).catch(()=>{});
 }
 function toggleIncomeForm(){
@@ -2835,7 +2852,7 @@ function snapshotAssets() {
     });
     rows.push([today,"總資產",1,totalMV,totalCost]);
     apiPost({tab:"History_Log",rows}).then(data=>{
-        if(data.includes("Success")){toast("📸 快照成功！",'success');reset();invalidateCache('History_Log');loadTrendChart();loadVsMarket();}
+        if(data.includes("Success")){toast("📸 快照成功！",'success');reset();invalidateCache('History_Log');loadTrendChart();loadVsMarket();loadPortfolioPerf();}
         else{toast("失敗："+data,'error');reset();}
     }).catch(()=>{toast("連線錯誤，請重試",'error');reset();});
 }
