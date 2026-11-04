@@ -61,6 +61,41 @@ function doGet(e) {
     }
   }
 
+  // 各帳戶餘額（給手機 widget / 捷徑用）：= Σ Asset_Log.金額(已帶正負) + Σ Expenses_DB.金額(收入+、支出−)
+  // 與網頁「帳戶餘額對帳」同一套算法，回傳精簡 JSON。
+  if (e.parameter.action === 'balances') {
+    var ssB = SpreadsheetApp.getActiveSpreadsheet();
+    var bal = {};
+    var numB = function (v) { return Number(String(v == null ? '' : v).replace(/,/g, '')) || 0; };
+    var sumTab = function (name, isExpTab) {
+      var sh = ssB.getSheetByName(name); if (!sh) return;
+      var d = sh.getDataRange().getValues(); if (d.length < 2) return;
+      var h = d[0].map(function (x) { return String(x).trim(); });
+      var ia = h.indexOf('帳戶'), im = h.indexOf('金額'), it = h.indexOf('收支');
+      if (ia < 0 || im < 0) return;
+      for (var r = 1; r < d.length; r++) {
+        var a = String(d[r][ia]).trim(); if (!a) continue;
+        var amt = numB(d[r][im]);
+        if (isExpTab) amt = (it >= 0 && String(d[r][it]).trim() === '支出') ? -amt : amt;
+        bal[a] = (bal[a] || 0) + amt;
+      }
+    };
+    sumTab('Asset_Log', false);
+    sumTab('Expenses_DB', true);
+    var orderB = ['富邦銀行', '郵局', '華南銀行', '中國信託', '台新銀行', '錢包', '悠遊卡', 'icash', 'ipassmoney', '學生證'];
+    var arr = Object.keys(bal).map(function (a) { return { account: a, balance: Math.round(bal[a]) }; });
+    arr.sort(function (x, y) {
+      var ix = orderB.indexOf(x.account), iy = orderB.indexOf(y.account);
+      return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy);
+    });
+    var totalB = arr.reduce(function (s, o) { return s + o.balance; }, 0);
+    return outJson({
+      updated: Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd HH:mm'),
+      total: totalB,
+      accounts: arr
+    });
+  }
+
   var tabName = e.parameter.tab;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = tabName ? ss.getSheetByName(tabName) : ss.getSheets()[0];
