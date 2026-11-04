@@ -89,9 +89,37 @@ function doGet(e) {
       return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy);
     });
     var totalB = arr.reduce(function (s, o) { return s + o.balance; }, 0);
+
+    // 投組現在市值：Portfolio 非現金、非彙總列的「總市值」加總（總市值為表上即時公式；與網頁 investMV 同一套）
+    var investValue = 0;
+    (function () {
+      var sh = ssB.getSheetByName('Portfolio'); if (!sh) return;
+      var d = sh.getDataRange().getValues(); if (d.length < 2) return;
+      var h = d[0].map(function (x) { return String(x).trim(); });
+      var ni = h.indexOf('項目名稱'); if (ni < 0) ni = h.indexOf('項目');
+      var mi = h.indexOf('總市值'); if (ni < 0 || mi < 0) return;
+      for (var r = 1; r < d.length; r++) {
+        var nm = String(d[r][ni] || '').trim(); if (!nm) continue;
+        if (nm.toLowerCase().indexOf('beta') >= 0) continue;
+        if (/總資產|總金額|總計|合計|淨值/.test(nm)) continue;
+        if (nm.indexOf('郵局') >= 0 || nm.indexOf('富邦銀行') >= 0 || nm.indexOf('現金') >= 0 ||
+            nm.indexOf('錢包') >= 0 || nm.indexOf('中國信託') >= 0) continue; // 現金列不算投組
+        investValue += numB(d[r][mi]);
+      }
+    })();
+    investValue = Math.round(investValue);
+
+    // 現金（CASH_ACCOUNTS 加總）與總資產淨值（＝現金＋投組市值，與網頁 totalAssets 同口徑）
+    var CASH = ['富邦銀行', '郵局', '華南銀行', '中國信託', '台新銀行', '錢包', '悠遊卡', 'icash', 'ipassmoney', '學生證'];
+    var cashTotal = CASH.reduce(function (s, a) { return s + (bal[a] || 0); }, 0);
+    var netWorth = Math.round(cashTotal + investValue);
+
     return outJson({
       updated: Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd HH:mm'),
       total: totalB,
+      cash: Math.round(cashTotal),
+      investValue: investValue,
+      netWorth: netWorth,
       accounts: arr
     });
   }

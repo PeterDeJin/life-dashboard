@@ -14,7 +14,8 @@
 // ===== 設定 =====
 const API_URL = "在這裡貼上你的 GAS 部署網址";          // 例：https://script.google.com/macros/s/XXXX/exec
 const ONLY = ["富邦銀行", "郵局", "華南銀行", "錢包"];     // 只顯示這幾個帳戶；留空 [] 則顯示全部
-const SHOW_TOTAL = true;                                 // 底部顯示合計
+const SHOW_TOTAL = true;                                 // 底部顯示各帳戶合計
+const SHOW_INVEST = true;                                // 顯示「投組市值」與「總資產」
 // ================
 
 const money = (n) => "$" + Math.round(n).toLocaleString("en-US");
@@ -82,6 +83,25 @@ async function buildWidget() {
     const r = line.addText(money(sum));
     r.textColor = Color.white();
     r.font = Font.boldSystemFont(14);
+  }
+
+  if (SHOW_INVEST && (data.investValue != null || data.netWorth != null)) {
+    w.addSpacer(7);
+    const addKV = (label, value, bold) => {
+      const s = w.addStack();
+      s.layoutHorizontally();
+      s.centerAlignContent();
+      const l = s.addText(label);
+      l.textColor = new Color("#dbe4ff");
+      l.font = Font.semiboldSystemFont(12);
+      s.addSpacer();
+      const v = s.addText(money(value));
+      v.textColor = value < 0 ? new Color("#ff8a9b") : Color.white();
+      v.font = bold ? Font.boldSystemFont(15) : Font.semiboldSystemFont(13);
+      w.addSpacer(2);
+    };
+    if (data.investValue != null) addKV("投組市值", data.investValue, false);
+    if (data.netWorth != null) addKV("總資產", data.netWorth, true);
   }
 
   w.addSpacer(6);
