@@ -20,6 +20,15 @@ const SHOW_INVEST = true;                                // 顯示「投組市�
 
 const money = (n) => "$" + Math.round(n).toLocaleString("en-US");
 
+// 帳戶代號 → 顯示名稱（跟 dashboard 的 FIN.accounts 一致；資料存的是代號）
+const LABELS = {
+  "ipassmoney": "Line Pay",
+  "錢包": "現金錢包",
+  "待付款": "待付款",
+  "台新信用卡": "台新信用卡",
+};
+const labelOf = (a) => LABELS[a] || a;
+
 async function getData() {
   const req = new Request(API_URL + "?action=balances");
   req.timeoutInterval = 15;
@@ -28,7 +37,11 @@ async function getData() {
 
 function pickAccounts(accounts) {
   if (!ONLY.length) return accounts;
-  return ONLY.map((name) => accounts.find((a) => a.account === name)).filter(Boolean);
+  const norm = (s) => String(s).toLowerCase().replace(/\s+/g, ""); // 比對時忽略大小寫與空格
+  // ONLY 裡可填「代號」(ipassmoney) 或「顯示名稱」(Line Pay)，兩種都對得上
+  return ONLY.map((name) =>
+    accounts.find((a) => norm(a.account) === norm(name) || norm(labelOf(a.account)) === norm(name))
+  ).filter(Boolean);
 }
 
 async function buildWidget() {
@@ -59,7 +72,7 @@ async function buildWidget() {
     const row = w.addStack();
     row.layoutHorizontally();
     row.centerAlignContent();
-    const name = row.addText(a.account);
+    const name = row.addText(labelOf(a.account));
     name.textColor = Color.white();
     name.font = Font.systemFont(13);
     name.lineLimit = 1;
