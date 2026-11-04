@@ -703,27 +703,15 @@
 // ==========================================
 // 🔐 登入系統
 // ==========================================
-let savedUrl  = localStorage.getItem("MY_DASHBOARD_URL");
-let savedPass = localStorage.getItem("MY_DASHBOARD_PASS");
+let savedUrl = localStorage.getItem("MY_DASHBOARD_URL");
 
-if (!savedUrl || !savedPass) {
-    alert("👋 歡迎！這是第一次使用，請進行初始設定。");
+// 已移除密碼鎖：開啟就直接進（安全靠手機鎖屏）。首次使用仍需貼上 GAS 部署網址才讀得到資料。
+if (!savedUrl) {
+    alert("👋 歡迎！這是第一次使用，請貼上你的 GAS 部署網址。");
     let u = prompt("請貼上您的 GAS 部署網址:");
     if (u) { savedUrl = u.trim(); localStorage.setItem("MY_DASHBOARD_URL", savedUrl); }
-    let p = prompt("請設定登入密碼:");
-    if (p) { savedPass = p.trim(); localStorage.setItem("MY_DASHBOARD_PASS", savedPass); }
 }
-if (!savedUrl || !savedPass) { alert("⚠️ 設定未完成，請重新整理。"); throw new Error("Setup Incomplete"); }
-
-// sessionStorage：關分頁就需重新驗證，不用每次都彈視窗
-if (!sessionStorage.getItem("LOGGED_IN")) {
-    const check = prompt("🔒 請輸入密碼解鎖：");
-    if (check !== savedPass) {
-        document.body.innerHTML = `<div style='display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;text-align:center;'><h1>⛔️ 密碼錯誤</h1><p>存取被拒絕。</p><button onclick='localStorage.clear();location.reload();' style='padding:10px 20px;font-size:1rem;cursor:pointer;color:#333;'>重設所有設定</button></div>`;
-        throw new Error("Access Denied");
-    }
-    sessionStorage.setItem("LOGGED_IN", "1");
-}
+if (!savedUrl) { alert("⚠️ 尚未設定 GAS 網址，請重新整理後再貼上。"); throw new Error("Setup Incomplete"); }
 
 // ==========================================
 // 🟢 全域設定
