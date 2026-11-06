@@ -163,6 +163,28 @@ async function recordTransfer() {
   await tell(ok ? "✅ 轉帳完成" : "❌ 失敗", ok ? `${labelOf(from)} → ${labelOf(to)}　${amt.toLocaleString("en-US")}` : res);
 }
 
+// 當它被放成桌面 widget 時，只畫一個「按鈕磚」（widget 內不能跳 Alert）
+function buildMenuWidget() {
+  const w = new ListWidget();
+  w.setPadding(16, 16, 16, 16);
+  const grad = new LinearGradient();
+  grad.colors = [new Color("#5b21b6"), new Color("#7c3aed")];
+  grad.locations = [0, 1];
+  w.backgroundGradient = grad;
+  const t = w.addText("📒 記帳中心");
+  t.textColor = Color.white();
+  t.font = Font.semiboldSystemFont(18);
+  w.addSpacer(6);
+  const s = w.addText("點一下");
+  s.textColor = new Color("#e9d5ff");
+  s.font = Font.systemFont(13);
+  const s2 = w.addText("記支出 / 收入 / 轉帳");
+  s2.textColor = new Color("#e9d5ff");
+  s2.font = Font.systemFont(13);
+  w.addSpacer();
+  return w;
+}
+
 async function main() {
   if (API_URL.includes("貼上")) { await tell("尚未設定", "請先在腳本最上面填 API_URL"); return; }
   const m = new Alert();
@@ -178,5 +200,10 @@ async function main() {
   else if (i === 2) await recordTransfer();
 }
 
-await main();
+if (config.runsInWidget) {
+  // 桌面 widget：只顯示按鈕磚，點擊才真正記帳（需把 widget 的「互動時」設成 Run Script）
+  Script.setWidget(buildMenuWidget());
+} else {
+  await main();
+}
 Script.complete();
