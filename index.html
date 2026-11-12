@@ -116,6 +116,11 @@
         body.dark .cal-sel { background: #23344d; }
         .cal-hol .cal-num { color: #d32f2f; }
         body.dark .cal-hol .cal-num { color: #ff6b6b; }
+        .cal-inc { font-size: 0.58rem; line-height: 1.1; margin-top: 1px; font-weight: 700; }
+        .cal-inc.pos { color: #2e7d32; }
+        .cal-inc.neg { color: #d32f2f; }
+        body.dark .cal-inc.pos { color: #66bb6a; }
+        body.dark .cal-inc.neg { color: #ff6b6b; }
     </style>
 </head>
 <body>
@@ -1300,7 +1305,9 @@ ${invChips?`<div style="display:flex;flex-wrap:wrap;gap:6px;">${invChips}</div>`
 }
 
 // ========== 行事曆 ==========
-let calYear, calMonth, calSelected=null, calTodoMap={}, calEvents=[], calRecs=[];
+let calYear, calMonth, calSelected=null, calTodoMap={}, calEvents=[], calRecs=[], calIncomeMap={};
+// 月曆格子用的收入縮寫：>=1萬顯示「X萬」，否則整數；帶正負號
+function fmtCalInc(v){ const a=Math.abs(v), sign=v<0?'−':'+'; const body=a>=10000?(+(a/10000).toFixed(1))+'萬':String(Math.round(a)); return sign+body; }
 function calKey(y,m,d){ return y+'/'+String(m+1).padStart(2,'0')+'/'+String(d).padStart(2,'0'); }
 // 解析日期欄：支援「開始~結束」跨天區間，回傳 {s:起始, e:結束}(單日則兩者同天)；解析失敗回傳 null
 function parseDateRange(v){
@@ -1313,8 +1320,11 @@ function parseDateRange(v){
     return {s,e};
 }
 function buildCalData(){
-    return Promise.all([fetchTab('Todo_DB'),fetchTab('Events_DB'),fetchTab('Recurring_DB')]).then(([todos,events,recs])=>{
+    return Promise.all([fetchTab('Todo_DB'),fetchTab('Events_DB'),fetchTab('Recurring_DB'),fetchTab('Asset_Log'),fetchTab('Expenses_DB')]).then(([todos,events,recs,assetLog,expDb])=>{
         calTodoMap={};
+        // 每日收入加總（與全站同一套 collectIncome：Asset_Log 舊紀錄＋Expenses_DB 收支=收入；date 為 yyyy/MM/dd，直接對應 calKey）
+        calIncomeMap={};
+        collectIncome(assetLog, expDb).forEach(r=>{ if(r.date) calIncomeMap[r.date]=(calIncomeMap[r.date]||0)+r.amt; });
         (Array.isArray(todos)?todos:[]).forEach(r=>{
             if(_isDone(r.完成)) return;
             const t=String(r.任務||r.項目||'').trim(); if(!t||!r.截止日) return;
@@ -1390,7 +1400,9 @@ function renderCalendar(){
             const key=calKey(calYear,calMonth,d), items=calItems(calYear,calMonth,d);
             const hol=(holidayCache[calYear]||{})[key];
             const dots=items.slice(0,4).map(x=>`<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${x.color};margin:0 1px;"></span>`).join('');
-            html+=`<div class="cal-cell cal-day${key===tKey?' cal-today':''}${key===calSelected?' cal-sel':''}${hol&&hol.holiday?' cal-hol':''}" data-key="${key}"><div class="cal-num">${d}</div><div class="cal-dots">${dots}</div></div>`;
+            const inc=calIncomeMap[key]||0;
+            const incHtml=inc?`<div class="cal-inc ${inc<0?'neg':'pos'}">${fmtCalInc(inc)}</div>`:'';
+            html+=`<div class="cal-cell cal-day${key===tKey?' cal-today':''}${key===calSelected?' cal-sel':''}${hol&&hol.holiday?' cal-hol':''}" data-key="${key}"><div class="cal-num">${d}</div><div class="cal-dots">${dots}</div>${incHtml}</div>`;
         }
         html+='</div>';
     }
@@ -1401,7 +1413,9 @@ function renderCalDetail(key){
     calSelected=key;
     const box=document.getElementById('calDetail'); if(!box) return;
     const p=key.split('/'), items=calItems(+p[0],+p[1]-1,+p[2]);
-    const head=`<div style="font-weight:bold;margin-bottom:6px;color:#333;">${key}</div>`;
+    const inc=calIncomeMap[key]||0;
+    const incLine=inc?`<div style="margin-bottom:6px;font-weight:bold;color:${inc<0?'#d32f2f':'#2e7d32'};">💵 當天收入 ${inc<0?'−':'+'}$${Math.abs(Math.round(inc)).toLocaleString()}</div>`:'';
+    const head=`<div style="font-weight:bold;margin-bottom:6px;color:#333;">${key}</div>`+incLine;
     const body = items.length
         ? items.map(x=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${x.color};flex:none;"></span><span style="color:#444;">${esc(x.label)}</span></div>`).join('')
         : "<div style='color:#bbb;'>這天沒有安排</div>";
