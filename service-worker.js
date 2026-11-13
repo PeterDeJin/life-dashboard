@@ -1,6 +1,6 @@
 // My Life Dashboard — Service Worker
 // 改版時把 v 數字 +1，使用者下次連線就會更新快取
-const CACHE = 'life-dashboard-v3';
+const CACHE = 'life-dashboard-v4';
 
 // App 本體（離線也要能開）
 const SHELL = [
